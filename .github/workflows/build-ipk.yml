@@ -80,7 +80,7 @@ jobs:
     - name: Include sing-box license and copyright
       run: |
         cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
-        mv opt/sbin/LICENSE CONTROL/control
+        mv opt/sbin/LICENSE CONTROL/
         cd /
  
     - name: Package IPK
