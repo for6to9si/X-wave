@@ -1,0 +1,182 @@
+name: Build sing-box IPK packages
+
+on:
+  release:
+    types: [created] # Этот тип срабатывает, когда релиз создается
+  workflow_dispatch:
+  repository_dispatch:
+  push:
+    tags:
+      - 'v*'
+      
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build-ipk:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [arm64, mipsle]
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y tar gzip jq
+
+    - name: Determine version
+      id: version
+      run: |
+        VERSION=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "Using version: ${VERSION}"
+
+    - name: Download sing-box
+      run: |
+        wget https://github.com/SagerNet/sing-box/releases/download/v${{ steps.version.outputs.version }}/sing-box-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
+
+    - name: Create IPK package structure
+      run: |
+        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
+        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d
+        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/sing-box/configs
+        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
+
+        tar -xzf sing-box-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz -C sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin --strip-components=1
+
+        cat > sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S97sing-box <<EOF
+        #!/bin/sh /etc/rc.common
+
+        START=99
+        STOP=10
+
+        start() {
+            /opt/sbin/sing-box run -c /opt/etc/sing-box/config.json &
+        }
+
+        stop() {
+            killall sing-box
+        }
+        EOF
+
+        chmod +x sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S97sing-box
+
+        cat > sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
+        Package: sing-box
+        Depends: libc, libssp, librt, libpthread, libpthread
+        Version: ${{ steps.version.outputs.version }}
+        Architecture: mipsel-3.4
+        Maintainer: GitHub Actions <actions@github.com>
+        Section: net
+        Description: The universal proxy platform.
+        EOF
+
+    - name: Package IPK
+      run: |
+        cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
+        mv opt/sbin/LICENSE opt/etc/sing-box/
+        tar -czf ../data.tar.gz ./opt/sbin ./opt/etc
+        cd ./CONTROL
+        tar -czf ../../control.tar.gz *
+        cd ..
+        echo "2.0" > ../debian-binary
+        cd ..
+        tar -czf sing-box_${{ steps.version.outputs.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
+        
+    - name: Bump version file
+      uses: francktrouillez/auto-bump-version-file@v1
+      with:
+        file: 'VERSION'
+
+    - name: Display artifacts
+      run: |
+        ls -al ./
+        ls -aR ./
+        
+    - name: Set environment variable
+      run: echo "MY_ENV_VAR=myValue" >> $GITHUB_ENV
+
+    - name: Use environment variable
+      run: |
+        echo "The value of MY_ENV_VAR is $MY_ENV_VAR"
+
+    - name: Store build timestamp
+      run: echo "BUILD_TIME=$(date +'%T')" >> $GITHUB_ENV
+
+    - name: Deploy using stored timestamp
+      run: echo "Deploying at $BUILD_TIME"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sing-box-${{ matrix.arch }} 
+        path: ./*.ipk
+        if-no-files-found: error
+
+  deploy-repository:
+    runs-on: ubuntu-latest
+    needs: [build-ipk]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Generate unique tag
+        id: generate_tag
+        run: |
+          TAG_NAME="v$(date -u +'%Y.%m.%d-%H.%M.%S')"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ env.TAG_NAME }}
+          git push origin ${{ env.TAG_NAME }}
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./
+
+      - name: Display artifacts
+        run: |
+          ls -al ./
+          ls -R ./
+
+      - name: Use environment variable
+        run: |
+          echo "The value of MY_ENV_VAR is $MY_ENV_VAR"
+
+      - name: Deploy using stored timestamp
+        run: echo "Deploying at $BUILD_TIME"
+          
+      # - name: Build artifact
+      #   run: |
+      #     mkdir -p build
+      #     echo "Building sing-box..."
+      #     cp *.ipk ./build/
+
+      # - name: Display artifacts
+      #   run: |
+      #     ls -al ./sing-box_1.11.7_mipsle.ipk
+      #     ls -R ./
+      - name: "Build & test"
+        run: |
+          echo "done!"
+
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "latest"
+          title: "Development Build"
+          prerelease: false
+          files: |
+            */*.ipk
+
+
