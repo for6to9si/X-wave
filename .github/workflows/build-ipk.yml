@@ -71,15 +71,16 @@ jobs:
         Depends: libc, libssp, librt, libpthread, libpthread
         Version: ${{ steps.version.outputs.version }}
         Architecture: mipsel-3.4
-        Maintainer: GitHub Actions <actions@github.com>
+        Maintainer: GitHub Actions <for6to9si@gmail.com>
         Section: net
-        Description: The universal proxy platform.
+        Description: A minimalistic tool to automate Sing-box setup on Keenetic router systems..
+        License: GPL-3.0 license
         EOF
 
     - name: Include sing-box license and copyright
       run: |
         cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
-        mv opt/sbin/LICENSE opt/etc/sing-box/
+        mv opt/sbin/LICENSE CONTROL/control
         cd /
  
     - name: Package IPK
