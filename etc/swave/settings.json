@@ -1,0 +1,14 @@
+{
+  "client": {
+    "name": "sing-box",
+    "version": "1.11.7",
+    "path_config": "/opt/etc/sing-box/configs"
+  },
+  "network": {
+    "connection_policy" : "swave",
+    "chain_name": "swave",
+    "port_forwarding_list": [80,443,8080],
+    "DNS_forwarding": true,
+    "IPv6": true
+  }
+}
