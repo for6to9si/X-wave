@@ -88,10 +88,10 @@ jobs:
         cd ..
         tar -czf sing-box_${{ steps.version.outputs.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
         
-    - name: Bump version file
-      uses: francktrouillez/auto-bump-version-file@v1
-      with:
-        file: 'VERSION'
+    # - name: Bump version file
+    #   uses: francktrouillez/auto-bump-version-file@v1
+    #   with:
+    #     file: 'VERSION'
 
     - name: Display artifacts
       run: |
