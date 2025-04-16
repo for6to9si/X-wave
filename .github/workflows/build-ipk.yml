@@ -50,7 +50,7 @@ jobs:
         tar -xzf sing-box-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz -C sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin --strip-components=1
 
         cat > sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S97sing-box <<EOF
-        #!/bin/sh /etc/rc.common
+        #!/bin/sh
 
         START=99
         STOP=10
@@ -71,7 +71,6 @@ jobs:
         Depends: libc, libssp, librt, libpthread, libpthread
         Version: ${{ steps.version.outputs.version }}
         Architecture: mipsel-3.4
-        Maintainer: GitHub Actions <for6to9si@gmail.com>
         Section: net
         Description: A minimalistic tool to automate Sing-box setup on Keenetic router systems..
         License: GPL-3.0 license
