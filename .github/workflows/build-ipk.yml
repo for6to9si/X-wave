@@ -56,7 +56,7 @@ jobs:
         STOP=10
 
         start() {
-            /opt/sbin/sing-box run -c /opt/etc/sing-box/config.json &
+            /opt/sbin/sing-box run -C /opt/etc/sing-box/configs/config.json &
         }
 
         stop() {
@@ -76,10 +76,15 @@ jobs:
         Description: The universal proxy platform.
         EOF
 
-    - name: Package IPK
+    - name: Include sing-box license and copyright
       run: |
         cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
         mv opt/sbin/LICENSE opt/etc/sing-box/
+        cd /
+ 
+    - name: Package IPK
+      run: |
+        cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
         tar -czf ../data.tar.gz ./opt/sbin ./opt/etc
         cd ./CONTROL
         tar -czf ../../control.tar.gz *
