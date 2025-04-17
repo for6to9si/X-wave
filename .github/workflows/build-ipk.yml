@@ -43,8 +43,10 @@ jobs:
     - name: Create IPK package structure
       run: |
         mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
+        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d
         mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d
         mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/sing-box/configs
+        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/swave
         mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
 
         tar -xzf sing-box-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz -C sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin --strip-components=1
@@ -74,12 +76,17 @@ jobs:
         Section: net
         Description: A minimalistic tool to automate Sing-box setup on Keenetic router systems..
         License: GPL-3.0 license
+        Maintainer: for6to9si <for6to9si@gmail.com>
         EOF
+        
+        cp /etc/ndm/netfilter.d/000-swave.sh sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
+        cp /etc/swave/settings.json sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/swave/settings.json
 
     - name: Include sing-box license and copyright
       run: |
         cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
-        mv opt/sbin/LICENSE CONTROL/
+        cp opt/sbin/LICENSE CONTROL/
+        mv opt/sbin/LICENSE opt/etc/sing-box/
         cd /
  
     - name: Package IPK
