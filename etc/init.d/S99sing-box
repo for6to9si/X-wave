@@ -37,6 +37,11 @@ color_yellow="\033[33m"
 color_reset="\033[0m"
 
 get_policy_mark() {
+
+    # Определяем коды цветов (используем $'...' для интерпретации escape-последовательностей)
+    _color_red=$'\033[31m'
+    _color_reset=$'\033[0m'
+
     policy_mark=$(
         curl -kfsS "localhost:79/rci/show/ip/policy" \
         | jq -r --arg policy "$(echo "$js_SETTING" | jq -r '.network.connection_policy')" '
@@ -47,8 +52,11 @@ get_policy_mark() {
     )
 
     if [ -z "$policy_mark" ]; then
-        # shellcheck disable=SC3037
-        echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_red}[ERROR]${color_reset} Не удалось получить отметку о политике для: $(echo "$js_SETTING" | jq -r '.network.connection_policy')" >&2
+        printf "%s %s[ERROR]%s Не удалось получить отметку о политике для: %s\n" \
+          "$(date '+%Y-%m-%d %H:%M:%S')" \
+          "$_color_red" \
+          "$_color_reset" \
+          "$(echo "$js_SETTING" | jq -r '.network.connection_policy')" >&2
         logger -t "$(basename "$0")" "Не удалось получить отметку о политике для: $(echo "$js_SETTING" | jq -r '.network.connection_policy')"
         return 1
     fi
