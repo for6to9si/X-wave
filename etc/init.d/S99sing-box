@@ -65,14 +65,19 @@ get_policy_mark() {
 }
 
 
-# init_ip_rules(){
-
-# }
+init_ip_rules() {
+  echo "test"
+}
 
 # Менеджер команд
 case "${1}" in
 start)
-    get_policy_mark "${2}"
+    policy_mark=$(get_policy_mark) || {
+    # shellcheck disable=SC3037
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_red}[ERROR]${color_reset} Настройте политику для Swave на вашем роутере " >&2
+    exit 1
+    }
+    init_ip_rules policy_mark
     ;;
 stop)
     proxy_stop
