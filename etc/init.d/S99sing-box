@@ -1,0 +1,88 @@
+#!/bin/sh
+
+# Информация о службе
+# Краткое описание: Запуск / Остановка sing-box
+
+# Путь к JSON-файлу с настройками
+SETTING="/opt/etc/swave/settings.json"
+
+get_clean_json() {
+  awk '
+  BEGIN { in_string = 0 }
+  {
+    line = $0
+    result = ""
+    for (i = 1; i <= length(line); i++) {
+      char = substr(line, i, 1)
+      next_char = substr(line, i+1, 1)
+      if (char == "\"" && prev != "\\") {
+        in_string = !in_string
+      }
+      if (!in_string && char == "/" && next_char == "/") {
+        break
+      }
+      result = result char
+      prev = char
+    }
+    print result
+  }' "$1"
+}
+
+js_SETTING=$(get_clean_json "$SETTING" | jq -c '.' 2>/dev/null)
+
+# Цвета
+color_green="\033[32m"
+color_red="\033[31m"
+color_yellow="\033[33m"
+color_reset="\033[0m"
+
+get_policy_mark() {
+    policy_mark=$(
+        curl -kfsS "localhost:79/rci/show/ip/policy" \
+        | jq -r --arg policy "$(echo "$js_SETTING" | jq -r '.network.connection_policy')" '
+            .[]
+            | select(.description
+            | ascii_downcase == ($policy | ascii_downcase))
+            | .mark'
+    )
+
+    if [ -z "$policy_mark" ]; then
+        echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_red}[ERROR]${color_reset} Не удалось получить отметку о политике для: $(echo "$js_SETTING" | jq -r '.network.connection_policy')" >&2
+        logger -t "$(basename "$0")" "Failed to get policy mark for: $(echo "$js_SETTING" | jq -r '.network.connection_policy')"
+        return 1
+    fi
+
+    echo "0x${policy_mark}"
+    return 0
+}
+
+
+# init_ip_rules(){
+
+# }
+
+# Менеджер команд
+case "${1}" in
+start)
+    get_policy_mark ${2}
+    ;;
+stop)
+    proxy_stop
+    ;;
+status)
+	if proxy_status; then
+		echo -e "  Прокси-клиент ${color_green}запущен${color_reset}"
+	else
+		echo -e "  Прокси-клиент ${color_red}не запущен${color_reset}"
+	fi
+    ;;
+restart)
+    proxy_stop
+    proxy_start ${2}
+    ;;
+*)
+    echo -e "  Команды: ${color_green}start${color_reset} | ${color_red}stop${color_reset} | ${color_yellow}restart${color_reset} | status"
+    ;;
+esac
+
+exit 0

@@ -4,6 +4,11 @@
     "version": "1.11.7",
     "path_config": "/opt/etc/sing-box/configs"
   },
+  "app": {
+    "name": "swave",
+    "version": "0.0.1",
+    "log": ""
+  },
   "network": {
     "connection_policy" : "swave",
     "chain_name": "swave",
