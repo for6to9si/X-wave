@@ -47,13 +47,13 @@ get_policy_mark() {
     )
 
     if [ -z "$policy_mark" ]; then
+        # shellcheck disable=SC3037
         echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_red}[ERROR]${color_reset} Не удалось получить отметку о политике для: $(echo "$js_SETTING" | jq -r '.network.connection_policy')" >&2
-        logger -t "$(basename "$0")" "Failed to get policy mark for: $(echo "$js_SETTING" | jq -r '.network.connection_policy')"
+        logger -t "$(basename "$0")" "Не удалось получить отметку о политике для: $(echo "$js_SETTING" | jq -r '.network.connection_policy')"
         return 1
     fi
 
     echo "0x${policy_mark}"
-    return 0
 }
 
 
@@ -64,7 +64,7 @@ get_policy_mark() {
 # Менеджер команд
 case "${1}" in
 start)
-    get_policy_mark ${2}
+    get_policy_mark "${2}"
     ;;
 stop)
     proxy_stop
