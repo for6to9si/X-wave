@@ -51,22 +51,9 @@ jobs:
 
         tar -xzf sing-box-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz -C sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin --strip-components=1
 
-        cat > sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S97sing-box <<EOF
-        #!/bin/sh
 
-        START=99
-        STOP=10
-
-        start() {
-            /opt/sbin/sing-box run -C /opt/etc/sing-box/configs/config.json &
-        }
-
-        stop() {
-            killall sing-box
-        }
-        EOF
-
-        chmod +x sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S97sing-box
+        cp ./etc/init.d/S99sing-box sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S99sing-box
+        chmod +x sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S99sing-box
 
         cat > sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
         Package: sing-box
