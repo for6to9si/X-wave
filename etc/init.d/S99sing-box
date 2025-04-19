@@ -31,16 +31,17 @@ get_clean_json() {
 js_SETTING=$(get_clean_json "$SETTING" | jq -c '.' 2>/dev/null)
 
 # Цвета
-color_green="\033[32m"
-color_red="\033[31m"
-color_yellow="\033[33m"
-color_reset="\033[0m"
+color_green="\033[32m"    # Успешное выполнение, позитивные сообщения
+color_red="\033[31m"      # Критические ошибки, опасные действия
+color_yellow="\033[33m"   # Предупреждения, не критичные проблемы
+color_reset="\033[0m"     # Сброс цвета к стандартному
 
 get_policy_mark() {
 
     # Определяем коды цветов (используем $'...' для интерпретации escape-последовательностей)
     _color_red=$'\033[31m'
     _color_reset=$'\033[0m'
+    _test="test1"
 
     policy_mark=$(
         curl -kfsS "localhost:79/rci/show/ip/policy" \
@@ -66,7 +67,50 @@ get_policy_mark() {
 
 
 init_ip_rules() {
-  echo "test"
+
+  table_mark=$(echo "$js_SETTING" | jq -r '.network.table_mark')
+  table_id=$(echo "$js_SETTING" | jq -r '.network.table_id')
+  echo "$table_mark"
+  echo "$table_id"
+  ip_version=4
+  if ! busybox ip -4 rule show | grep -q "fwmark ${table_mark} lookup ${table_id}" >/dev/null 2>&1; then
+  # shellcheck disable=SC3037
+  echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна создана" >&2
+  fi
+  # busybox ip -"${ip_version}" rule add fwmark "${table_mark}" lookup "${table_id}" >/dev/null 2>&1
+
+  # ip -"${ip_version}" route flush table 222  # Очищаем целевую таблицу (если она существует)
+  # busybox ip -"${ip_version}" route show table 16 |
+  # while IFS= read -r route; do
+  #   echo "${route}"
+  #   busybox ip -"${ip_version}" route add table 222 "$route"
+  # done
+  if ! busybox ip -"${ip_version}" rule show | grep -q "fwmark ${table_mark} lookup ${table_id}" >/dev/null 2>&1; then
+    if [ -n "${policy_mark}" ]; then
+      policy_table=$(busybox ip rule show | awk -v policy="${policy_mark}" '$0 ~ policy && /lookup/ && !/blackhole/{print $NF}')
+      echo "${policy_table}"
+    fi
+
+    busybox ip -"${ip_version}" rule add fwmark "${table_mark}" lookup "${table_id}" >/dev/null 2>&1
+    busybox ip -"${ip_version}" route add local default dev lo table "${table_id}" >/dev/null 2>&1
+
+    if [ -n "${policy_table}" ]; then
+      busybox ip -"${ip_version}" route show table "${policy_table}" | grep -Ev '^default' |
+      while read -r route; do
+        echo "DEBUG: route='$route'"
+        matching_main_route=$(busybox ip -"${ip_version}" route show table main | grep -F "${route}")
+        echo "${matching_main_route}"
+        echo "busybox ip -${ip_version} route add table ${table_id} ${matching_main_route}"
+        busybox ip -4 route add table "${table_id}" ${matching_main_route}
+      done
+    else
+      busybox ip -"${ip_version}" route show table main | grep -Ev '^default' |
+      while read -r route; do
+        echo "DEBUG: route='$route'"
+        busybox ip -"${ip_version}" route add table "${table_id}" "${route}" >/dev/null 2>&1
+      done
+    fi
+fi
 }
 
 # Менеджер команд
@@ -74,10 +118,10 @@ case "${1}" in
 start)
     policy_mark=$(get_policy_mark) || {
     # shellcheck disable=SC3037
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_red}[ERROR]${color_reset} Настройте политику для Swave на вашем роутере " >&2
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику Swave на вашем роутере " >&2
     exit 1
     }
-    init_ip_rules policy_mark
+    init_ip_rules "$policy_mark"
     ;;
 stop)
     proxy_stop

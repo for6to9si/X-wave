@@ -10,6 +10,8 @@
     "log": ""
   },
   "network": {
+    "table_id": "222",
+    "table_mark" : "444",
     "connection_policy" : "swave",
     "chain_name": "swave",
     "port_forwarding_list": [80,443,8080],
