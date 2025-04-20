@@ -38,7 +38,6 @@ restart_script() {
     exit $?
 }
 
-
 CMD=$(echo "$js_SETTING" | jq -r '.client.name')
 
 logger -p notice -t "$CMD" "$js_SETTING"
@@ -49,6 +48,7 @@ if pgrep -f "xray run" > /dev/null
 then
   if ! busybox ip -4 rule show | grep -q "fwmark ${table_mark} lookup ${table_id}" >/dev/null 2>&1; then
   # busybox ip -4 rule add fwmark 123 lookup 100 >>"$LOG_FILE" 2>&1
+
   fi
 else
 

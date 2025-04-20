@@ -1,20 +1,35 @@
 {
-  "client": {
+  "client":
+  {
     "name": "sing-box",
     "version": "1.11.7",
     "path_config": "/opt/etc/sing-box/configs"
   },
-  "app": {
+  "app":
+  {
     "name": "swave",
     "version": "0.0.1",
     "log": ""
   },
-  "network": {
+  "network":
+  {
     "table_id": "222",
     "table_mark_hex": "0x4629",
-    "connection_policy" : "swave",
+    "connection_policy": "swave",
     "chain_name": "swave",
-    "port_forwarding_list": [80,443,8080],
+    "modules":
+    [
+      "xt_TPROXY.ko",
+      "xt_owner.ko",
+      "xt_multiport.ko"
+    ],
+    "module_path": "/lib/modules/4.9-ndm-5",
+    "port_forwarding_list":
+    [
+      80,
+      443,
+      8080
+    ],
     "DNS_forwarding": true,
     "IPv6": true
   }

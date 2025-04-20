@@ -112,6 +112,49 @@ init_ip_rules() {
   fi
 }
 
+load_kernel_modules(){
+
+  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+  modules=$(echo "$js_SETTING" | jq -r '.network.modules | join(" ")')
+  modules_path=$(echo "$js_SETTING" | jq -r '.network.module_path')
+
+  echo "$chain_name"
+  echo "$modules"
+
+
+  echo "Проверка и загрузка модулей ядра..."
+
+
+  for mod in $modules; do
+      modname=$(basename "$mod" .ko)
+      if lsmod | grep -q "^$modname"; then
+          echo "Модуль $modname уже загружен."
+      else
+          echo "Модуль $modname не загружен. Пытаюсь загрузить..."
+          if insmod "$modules_path/$mod"; then
+              echo "Модуль $modname успешно загружен."
+          else
+              echo "Ошибка загрузки модуля $modname из $modules_path/$mod"
+          fi
+      fi
+  done
+}
+
+
+
+#создания цепи и правил
+init_iptables(){
+
+  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+
+  echo "$chain_name"
+  load_kernel_modules
+
+  if ! iptables -t nat -nL ${chain_name} >/dev/null 2>&1; then
+    iptables -t nat -N ${chain_name}
+      echo $chain_name
+  fi
+}
 
 
 del_ip_rules() {
@@ -140,8 +183,9 @@ start)
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику Swave на вашем роутере " >&2
     exit 1
     }
-    init_ip_rules 4
-    init_ip_rules 6
+    # init_ip_rules 4
+    # init_ip_rules 6
+    init_iptables
     ;;
 stop)
     del_ip_rules 4
