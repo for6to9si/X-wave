@@ -38,79 +38,104 @@ color_reset="\033[0m"     # Сброс цвета к стандартному
 
 get_policy_mark() {
 
-    # Определяем коды цветов (используем $'...' для интерпретации escape-последовательностей)
-    _color_red=$'\033[31m'
-    _color_reset=$'\033[0m'
-    _test="test1"
+  # Определяем коды цветов (используем $'...' для интерпретации escape-последовательностей)
+  _color_red=$'\033[31m'
+  _color_reset=$'\033[0m'
+  _test="test1"
 
-    policy_mark=$(
-        curl -kfsS "localhost:79/rci/show/ip/policy" \
-        | jq -r --arg policy "$(echo "$js_SETTING" | jq -r '.network.connection_policy')" '
-            .[]
-            | select(.description
-            | ascii_downcase == ($policy | ascii_downcase))
-            | .mark'
-    )
+  policy_mark=$(
+      curl -kfsS "localhost:79/rci/show/ip/policy" \
+      | jq -r --arg policy "$(echo "$js_SETTING" | jq -r '.network.connection_policy')" '
+          .[]
+          | select(.description
+          | ascii_downcase == ($policy | ascii_downcase))
+          | .mark'
+  )
 
-    if [ -z "$policy_mark" ]; then
-        printf "%s %s[ERROR]%s Не удалось получить отметку о политике для: %s\n" \
-          "$(date '+%Y-%m-%d %H:%M:%S')" \
-          "$_color_red" \
-          "$_color_reset" \
-          "$(echo "$js_SETTING" | jq -r '.network.connection_policy')" >&2
-        logger -t "$(basename "$0")" "Не удалось получить отметку о политике для: $(echo "$js_SETTING" | jq -r '.network.connection_policy')"
-        return 1
-    fi
+  if [ -z "$policy_mark" ]; then
+      printf "%s %s[ERROR]%s Не удалось получить отметку о политике для: %s\n" \
+        "$(date '+%Y-%m-%d %H:%M:%S')" \
+        "$_color_red" \
+        "$_color_reset" \
+        "$(echo "$js_SETTING" | jq -r '.network.connection_policy')" >&2
+      logger -t "$(basename "$0")" "Не удалось получить отметку о политике для: $(echo "$js_SETTING" | jq -r '.network.connection_policy')"
+      return 1
+  fi
 
-    echo "0x${policy_mark}"
+  echo "0x${policy_mark}"
 }
 
 
 init_ip_rules() {
-
   table_mark=$(echo "$js_SETTING" | jq -r '.network.table_mark')
   table_id=$(echo "$js_SETTING" | jq -r '.network.table_id')
-  echo "$table_mark"
-  echo "$table_id"
-  ip_version=4
-  if ! busybox ip -4 rule show | grep -q "fwmark ${table_mark} lookup ${table_id}" >/dev/null 2>&1; then
-  # shellcheck disable=SC3037
-  echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна создана" >&2
-  fi
-  # busybox ip -"${ip_version}" rule add fwmark "${table_mark}" lookup "${table_id}" >/dev/null 2>&1
 
-  # ip -"${ip_version}" route flush table 222  # Очищаем целевую таблицу (если она существует)
-  # busybox ip -"${ip_version}" route show table 16 |
-  # while IFS= read -r route; do
-  #   echo "${route}"
-  #   busybox ip -"${ip_version}" route add table 222 "$route"
-  # done
-  if ! busybox ip -"${ip_version}" rule show | grep -q "fwmark ${table_mark} lookup ${table_id}" >/dev/null 2>&1; then
+  echo "table_mark=${table_mark}"
+  echo "table_id=${table_id}"
+
+  ip_version=4
+
+  table_mark_hex=$(printf '0x%x' "$table_mark")
+
+  # Проверка, существует ли правило
+  if ! busybox ip -4 rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
+    # shellcheck disable=SC3037
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна создана" >&2
+  fi
+
+  # Повторная проверка, на случай если правило ещё не добавлено
+  if ! busybox ip -"${ip_version}" rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
+
+    # Если задан маркер политики, ищем связанную таблицу
     if [ -n "${policy_mark}" ]; then
-      policy_table=$(busybox ip rule show | awk -v policy="${policy_mark}" '$0 ~ policy && /lookup/ && !/blackhole/{print $NF}')
-      echo "${policy_table}"
+      policy_table=$(busybox ip rule show | awk -v policy="${policy_mark}" '$0 ~ policy && /lookup/ && !/blackhole/ {print $NF}')
+      echo "policy_table=${policy_table}"
     fi
 
+    # Добавляем правило и таблицу маршрутов
     busybox ip -"${ip_version}" rule add fwmark "${table_mark}" lookup "${table_id}" >/dev/null 2>&1
     busybox ip -"${ip_version}" route add local default dev lo table "${table_id}" >/dev/null 2>&1
 
+    # Копируем маршруты
     if [ -n "${policy_table}" ]; then
       busybox ip -"${ip_version}" route show table "${policy_table}" | grep -Ev '^default' |
-      while read -r route; do
-        echo "DEBUG: route='$route'"
-        matching_main_route=$(busybox ip -"${ip_version}" route show table main | grep -F "${route}")
-        echo "${matching_main_route}"
-        echo "busybox ip -${ip_version} route add table ${table_id} ${matching_main_route}"
-        busybox ip -4 route add table "${table_id}" ${matching_main_route}
+      while IFS= read -r route; do
+        matching_main_route=$(busybox ip -"${ip_version}" route show table "${policy_table}" | grep -F "${route}" || true)
+
+        if [ -n "${matching_main_route}" ]; then
+          busybox ip -"${ip_version}" route add table "${table_id}" ${matching_main_route} >/dev/null 2>&1
+        else
+          echo "WARN: Маршрут '${route}' не найден в основной таблице" >&2
+        fi
       done
     else
-      busybox ip -"${ip_version}" route show table main | grep -Ev '^default' |
-      while read -r route; do
-        echo "DEBUG: route='$route'"
-        busybox ip -"${ip_version}" route add table "${table_id}" "${route}" >/dev/null 2>&1
-      done
+        echo "ERROR: Маршрут не установлен"
     fi
-fi
+  fi
+}
+
+
+
+del_ip_rules() {
+
+  table_mark=$(echo "$js_SETTING" | jq -r '.network.table_mark')
+  table_id=$(echo "$js_SETTING" | jq -r '.network.table_id')
+
+  printf "table_mark=0x%x\n" "$table_mark"
+  echo "table_mark=${table_mark}"
+  echo "table_id=${table_id}"
+
+  table_mark_hex=$(printf '0x%x' "$table_mark")
+
+  ip_version=4
+
+  if busybox ip -4 rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
+
+    busybox ip -"${ip_version}" rule del fwmark ${table_mark} lookup ${table_id} >/dev/null 2>&1
+    busybox ip -"${ip_version}" route flush table ${table_id} >/dev/null 2>&1
+    # shellcheck disable=SC3037
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна удалена" >&2
+  fi
 }
 
 # Менеджер команд
@@ -124,7 +149,7 @@ start)
     init_ip_rules "$policy_mark"
     ;;
 stop)
-    proxy_stop
+    del_ip_rules
     ;;
 status)
 	if proxy_status; then
