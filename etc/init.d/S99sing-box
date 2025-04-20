@@ -67,24 +67,20 @@ get_policy_mark() {
 
 
 init_ip_rules() {
-  table_mark=$(echo "$js_SETTING" | jq -r '.network.table_mark')
+
+  ip_version="${1}"
+  echo "$ip_version"
+
+  table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
   table_id=$(echo "$js_SETTING" | jq -r '.network.table_id')
 
-  echo "table_mark=${table_mark}"
+  echo "table_mark=${table_mark_hex}"
   echo "table_id=${table_id}"
 
-  ip_version=4
-
-  table_mark_hex=$(printf '0x%x' "$table_mark")
-
   # Проверка, существует ли правило
-  if ! busybox ip -4 rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
-    # shellcheck disable=SC3037
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна создана" >&2
-  fi
-
-  # Повторная проверка, на случай если правило ещё не добавлено
   if ! busybox ip -"${ip_version}" rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
+
+  policy_mark=$(get_policy_mark)
 
     # Если задан маркер политики, ищем связанную таблицу
     if [ -n "${policy_mark}" ]; then
@@ -93,7 +89,7 @@ init_ip_rules() {
     fi
 
     # Добавляем правило и таблицу маршрутов
-    busybox ip -"${ip_version}" rule add fwmark "${table_mark}" lookup "${table_id}" >/dev/null 2>&1
+    busybox ip -"${ip_version}" rule add fwmark "${table_mark_hex}" lookup "${table_id}" >/dev/null 2>&1
     busybox ip -"${ip_version}" route add local default dev lo table "${table_id}" >/dev/null 2>&1
 
     # Копируем маршруты
@@ -111,6 +107,8 @@ init_ip_rules() {
     else
         echo "ERROR: Маршрут не установлен"
     fi
+    # shellcheck disable=SC3037
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна создана" >&2
   fi
 }
 
@@ -118,20 +116,16 @@ init_ip_rules() {
 
 del_ip_rules() {
 
-  table_mark=$(echo "$js_SETTING" | jq -r '.network.table_mark')
+  ip_version="${1}"
+
+  table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
   table_id=$(echo "$js_SETTING" | jq -r '.network.table_id')
 
-  printf "table_mark=0x%x\n" "$table_mark"
-  echo "table_mark=${table_mark}"
+  echo "table_mark=${table_mark_hex}"
   echo "table_id=${table_id}"
 
-  table_mark_hex=$(printf '0x%x' "$table_mark")
-
-  ip_version=4
-
-  if busybox ip -4 rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
-
-    busybox ip -"${ip_version}" rule del fwmark ${table_mark} lookup ${table_id} >/dev/null 2>&1
+  if busybox ip -"${ip_version}" rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
+    busybox ip -"${ip_version}" rule del fwmark ${table_mark_hex} lookup ${table_id} >/dev/null 2>&1
     busybox ip -"${ip_version}" route flush table ${table_id} >/dev/null 2>&1
     # shellcheck disable=SC3037
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна удалена" >&2
@@ -146,10 +140,12 @@ start)
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику Swave на вашем роутере " >&2
     exit 1
     }
-    init_ip_rules "$policy_mark"
+    init_ip_rules 4
+    init_ip_rules 6
     ;;
 stop)
-    del_ip_rules
+    del_ip_rules 4
+    del_ip_rules 6
     ;;
 status)
 	if proxy_status; then
