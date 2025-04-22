@@ -171,13 +171,13 @@ jobs:
         run: |
           echo "done!"
 
-      - uses: "marvinpinto/action-automatic-releases@latest"
+      - uses: "svenstaro/upload-release-action@v2"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
           title: "Development Build"
           prerelease: false
-          files: |
+          file: |
             */*.ipk
 
 
