@@ -177,6 +177,7 @@ jobs:
           automatic_release_tag: "latest"
           title: "Development Build"
           prerelease: false
+          file_glob: true
           file: |
             */*.ipk
 
