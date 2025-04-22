@@ -48,7 +48,7 @@ if pgrep -f "xray run" > /dev/null
 then
   if ! busybox ip -4 rule show | grep -q "fwmark ${table_mark} lookup ${table_id}" >/dev/null 2>&1; then
   # busybox ip -4 rule add fwmark 123 lookup 100 >>"$LOG_FILE" 2>&1
-
+  echo "test"
   fi
 else
 

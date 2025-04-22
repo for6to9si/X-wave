@@ -114,27 +114,22 @@ init_ip_rules() {
 
 load_kernel_modules(){
 
-  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
   modules=$(echo "$js_SETTING" | jq -r '.network.modules | join(" ")')
   modules_path=$(echo "$js_SETTING" | jq -r '.network.module_path')
-
-  echo "$chain_name"
-  echo "$modules"
-
-
-  echo "Проверка и загрузка модулей ядра..."
-
 
   for mod in $modules; do
       modname=$(basename "$mod" .ko)
       if lsmod | grep -q "^$modname"; then
-          echo "Модуль $modname уже загружен."
+          continue
       else
           echo "Модуль $modname не загружен. Пытаюсь загрузить..."
+          logger -t "$(basename "$0")" "Модуль $modname не загружен. Пытаюсь загрузить..."
           if insmod "$modules_path/$mod"; then
               echo "Модуль $modname успешно загружен."
+              logger -t "$(basename "$0")" "Модуль $modname успешно загружен."
           else
               echo "Ошибка загрузки модуля $modname из $modules_path/$mod"
+              logger -t "$(basename "$0")" "Ошибка загрузки модуля $modname из $modules_path/$mod"
           fi
       fi
   done
@@ -146,15 +141,55 @@ load_kernel_modules(){
 init_iptables(){
 
   chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+  table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
+  port_tproxy=$(echo "$js_SETTING" | jq -r '.network.port_tproxy')
+  port_redirect=$(echo "$js_SETTING" | jq -r '.network.port_redirect')
+  policy_mark=$(get_policy_mark)
 
   echo "$chain_name"
   load_kernel_modules
 
+
+  #REDIRECT
   if ! iptables -t nat -nL ${chain_name} >/dev/null 2>&1; then
     iptables -t nat -N ${chain_name}
-      echo $chain_name
+    echo "#REDIRECT"
+    iptables -w -t nat -A ${chain_name} -p tcp -j REDIRECT --to-port "${port_redirect}"
+  fi
+
+
+  #TPROXY
+  if ! iptables -t mangle -nL ${chain_name} >/dev/null 2>&1; then
+    iptables -t mangle -N ${chain_name}
+    echo "#TPROXY"
+    iptables -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}"
+	  iptables -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip 127.0.0.1 --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}"
+  fi
+
+}
+
+del_iptables() {
+  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+
+  # Проверим, существует ли пользовательская цепочка
+  if iptables -t nat -S | grep -qP "^-N ${chain_name}\b"; then
+    echo "[+] Flushing chain: ${chain_name}"
+    iptables -t nat -F "${chain_name}"
+
+    echo "[+] Removing jumps to chain: ${chain_name}"
+    while iptables -t nat -S | grep -P "^-A .+ -j ${chain_name}\b" >/dev/null; do
+      # Удалим правило, которое переходит в эту цепочку
+      local rule=$(iptables -t nat -S | grep -P "^-A .+ -j ${chain_name}\b" | head -n 1)
+      eval iptables -t nat ${rule/-A/-D}
+    done
+
+    echo "[+] Deleting chain: ${chain_name}"
+    iptables -t nat -X "${chain_name}"
+  else
+    echo "[!] Chain '${chain_name}' does not exist or is not user-defined"
   fi
 }
+
 
 
 del_ip_rules() {
@@ -188,8 +223,9 @@ start)
     init_iptables
     ;;
 stop)
-    del_ip_rules 4
-    del_ip_rules 6
+    #del_ip_rules 4
+    #del_ip_rules 6
+    del_iptables
     ;;
 status)
 	if proxy_status; then
