@@ -179,25 +179,26 @@ del_iptables() {
 
   for family in iptables ip6tables; do
     for table in nat mangle; do
-      echo "[*] Checking ${family} table: $table"
+      echo "[*] Проверка таблицы '$table' (${family})"
       if $family -t "$table" -S 2>/dev/null | grep -qP "^-N ${chain_name}\b"; then
-        echo "[+] Flushing chain '$chain_name' in ${family} table '$table'"
+        echo "[+] Очистка цепочки '${chain_name}' в таблице '$table' (${family})"
         $family -t "$table" -F "${chain_name}"
 
-        echo "[+] Removing jumps to chain '$chain_name' in ${family} table '$table'"
+        echo "[+] Удаление переходов в цепочку '${chain_name}' в таблице '$table' (${family})"
         while $family -t "$table" -S 2>/dev/null | grep -P "^-A .+ -j ${chain_name}\b" >/dev/null; do
           local rule=$($family -t "$table" -S 2>/dev/null | grep -P "^-A .+ -j ${chain_name}\b" | head -n 1)
           eval $family -t "$table" ${rule/-A/-D}
         done
 
-        echo "[+] Deleting chain '$chain_name' in ${family} table '$table'"
+        echo "[+] Удаление цепочки '${chain_name}' в таблице '$table' (${family})"
         $family -t "$table" -X "${chain_name}"
       else
-        echo "[!] Chain '${chain_name}' not found in ${family} table '$table'"
+        echo "[!] Цепочка '${chain_name}' не найдена или не является пользовательской в таблице '$table' (${family})"
       fi
     done
   done
 }
+
 
 del_ip_rules() {
 
@@ -217,6 +218,8 @@ del_ip_rules() {
   fi
 }
 
+IPv6=$(echo "$js_SETTING" | jq -r '.network.IPv6 // "false"')
+
 # Менеджер команд
 case "${1}" in
 start)
@@ -225,8 +228,8 @@ start)
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику Swave на вашем роутере " >&2
     exit 1
     }
-    # init_ip_rules 4
-    # init_ip_rules 6
+    init_ip_rules 4
+    [ "$IPv6" == "true" ] && init_ip_rules 6
     init_iptables
     ;;
 stop)
