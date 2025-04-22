@@ -47,6 +47,7 @@ jobs:
         mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d
         mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/sing-box/configs
         mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/swave
+        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/var/log/swave
         mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
 
         tar -xzf sing-box-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz -C sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin --strip-components=1
@@ -80,7 +81,7 @@ jobs:
     - name: Package IPK
       run: |
         cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
-        tar -czf ../data.tar.gz ./opt/sbin ./opt/etc
+        tar -czf ../data.tar.gz ./opt/sbin ./opt/etc ./opt/var/log/swave
         cd ./CONTROL
         tar -czf ../../control.tar.gz *
         cd ..
