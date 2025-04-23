@@ -2,13 +2,12 @@
   "client":
   {
     "name": "sing-box",
-    "version": "1.11.7",
     "path_config": "/opt/etc/sing-box/configs"
   },
   "app":
   {
     "name": "swave",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "log": ""
   },
   "network":

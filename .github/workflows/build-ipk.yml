@@ -117,23 +117,76 @@ jobs:
   deploy-repository:
     runs-on: ubuntu-latest
     needs: [build-ipk]
-    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from VERSION file
+        id: generate_tag
+        run: |
+          get_clean_json() {
+            awk '
+            BEGIN { in_string = 0 }
+            {
+              line = $0
+              result = ""
+              for (i = 1; i <= length(line); i++) {
+              char = substr(line, i, 1)
+              next_char = substr(line, i+1, 1)
+              if (char == "\"" && prev != "\\") {
+              in_string = !in_string
+            }
+              if (!in_string && char == "/" && next_char == "/") {
+              break
+            }
+              result = result char
+              prev = char
+            }
+              print result
+            }' "$1"
+          }
+          
+          js_SETTING=$(get_clean_json etc/swave/settings.json | jq -c '.' 2>/dev/null)
+          TAG_NAME="v$(echo "$js_SETTING" | jq -r '.app.version')"
+          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Git tag and push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.generate_tag.outputs.tag_name }}
+          git push origin ${{ steps.generate_tag.outputs.tag_name }}
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Upload artifacts to existing release
+      - name: Create release and upload artifacts (signed)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=${{ github.ref_name }}
-          gh release upload "$TAG" artifacts/sing-box-*/sing-box_*.ipk \
+          TAG=${{ steps.generate_tag.outputs.tag_name }}
+
+          # Найдём предыдущий тег по дате создания
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -n 1 || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found. Logging all history."
+            git log --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
+          else
+            echo "Generating changelog from $PREV_TAG to HEAD"
+            git log "$PREV_TAG"..HEAD --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
+          fi
+
+          echo "Changelog:"
+          cat changelog.txt
+
+          gh release create "$TAG" artifacts/sing-box-*/sing-box_*.ipk \
             --repo "$GITHUB_REPOSITORY" \
-            --clobber
+            --title "Release $TAG" \
+            --notes-file changelog.txt
 
 
