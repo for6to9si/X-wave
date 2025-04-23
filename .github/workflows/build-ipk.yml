@@ -84,23 +84,6 @@ jobs:
         cd ..
         tar -czf sing-box_${{ steps.version.outputs.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
         
-    # - name: Bump version file
-    #   uses: francktrouillez/auto-bump-version-file@v1
-    #   with:
-    #     file: 'VERSION'
-
-    - name: Display artifacts
-      run: |
-        ls -al ./
-        ls -aR ./
-        
-    - name: Set environment variable
-      run: echo "MY_ENV_VAR=myValue" >> $GITHUB_ENV
-
-    - name: Use environment variable
-      run: |
-        echo "The value of MY_ENV_VAR is $MY_ENV_VAR"
-
     - name: Store build timestamp
       run: echo "BUILD_TIME=$(date +'%T')" >> $GITHUB_ENV
 
