@@ -3,11 +3,6 @@ name: Build sing-box IPK packages
 on:
   release:
     types: [created] # Этот тип срабатывает, когда релиз создается
-  workflow_dispatch:
-  repository_dispatch:
-  push:
-    tags:
-      - 'v*'
       
 permissions:
   contents: write
@@ -122,63 +117,23 @@ jobs:
   deploy-repository:
     runs-on: ubuntu-latest
     needs: [build-ipk]
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Generate unique tag
-        id: generate_tag
-        run: |
-          TAG_NAME="v$(date -u +'%Y.%m.%d-%H.%M.%S')"
-          echo "tag_name=$TAG_NAME" >> $GITHUB_ENV
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create Git tag
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git tag ${{ env.TAG_NAME }}
-          git push origin ${{ env.TAG_NAME }}
-
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          path: ./
+          path: artifacts
 
-      - name: Display artifacts
+      - name: Upload artifacts to existing release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ls -al ./
-          ls -R ./
-
-      - name: Use environment variable
-        run: |
-          echo "The value of MY_ENV_VAR is $MY_ENV_VAR"
-
-      - name: Deploy using stored timestamp
-        run: echo "Deploying at $BUILD_TIME"
-          
-      # - name: Build artifact
-      #   run: |
-      #     mkdir -p build
-      #     echo "Building sing-box..."
-      #     cp *.ipk ./build/
-
-      # - name: Display artifacts
-      #   run: |
-      #     ls -al ./sing-box_1.11.7_mipsle.ipk
-      #     ls -R ./
-      - name: "Build & test"
-        run: |
-          echo "done!"
-
-      - uses: "svenstaro/upload-release-action@v2"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
-          title: "Development Build"
-          prerelease: false
-          file_glob: true
-          file: |
-            */*.ipk
+          TAG=${{ github.ref_name }}
+          gh release upload "$TAG" artifacts/sing-box-*/sing-box_*.ipk \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
 
 
