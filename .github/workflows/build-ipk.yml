@@ -169,7 +169,7 @@ jobs:
           gh release create "$TAG" artifacts/sing-box-*/sing-box_*.ipk \
             --repo "$GITHUB_REPOSITORY" \
             --title "Release $TAG" \
-            --notes-file changelog.txt
+            --notes-file changelog.txt \
             --prerelease
 
 
