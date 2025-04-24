@@ -8,7 +8,7 @@
   {
     "name": "swave",
     "version": "0.0.4",
-    "log": ""
+    "log": "/opt/var/log/swave/swava.log"
   },
   "network":
   {

@@ -36,6 +36,12 @@ color_red="\033[31m"      # Критические ошибки, опасные 
 color_yellow="\033[33m"   # Предупреждения, не критичные проблемы
 color_reset="\033[0m"     # Сброс цвета к стандартному
 
+IP_RULES_LOG=$(echo "$js_SETTING" | jq -r '.app.log')
+
+# Если переменная не задана, используем /dev/null
+LOG_FILE="${IP_RULES_LOG:-/dev/null}"
+
+
 get_policy_mark() {
 
   # Определяем коды цветов (используем $'...' для интерпретации escape-последовательностей)
@@ -145,7 +151,8 @@ init_iptables(){
   port_redirect=$(echo "$js_SETTING" | jq -r '.network.port_redirect')
   policy_mark=$(get_policy_mark)
   IPv6=$(echo "$js_SETTING" | jq -r '.network.IPv6 // "false"')
-  echo $IPv6
+  port_forwarding_list=$(echo "$js_SETTING" | jq -r '.network.port_forwarding_list | join(",")')
+
 
   echo "$chain_name"
   load_kernel_modules
@@ -159,17 +166,18 @@ init_iptables(){
 
     # REDIRECT
     if ! "${family}" -t nat -nL ${chain_name} >/dev/null 2>&1; then
-      "${family}" -t nat -N ${chain_name}
+      "${family}" -w -t nat -N ${chain_name} >"$LOG_FILE" 2>&1
       echo "#REDIRECT ($family)"
-      "${family}" -w -t nat -A ${chain_name} -p tcp -j REDIRECT --to-port "${port_redirect}"
+      "${family}" -w -t nat -A ${chain_name} -p tcp -j REDIRECT --to-port "${port_redirect}" >"$LOG_FILE" 2>&1
+      "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp -m multiport --dports  ${port_forwarding_list} -j ${chain_name} >"$LOG_FILE" 2>&1
     fi
 
     # TPROXY
     if ! "${family}" -t mangle -nL ${chain_name} >/dev/null 2>&1; then
-      "${family}" -t mangle -N ${chain_name}
+      "${family}" -w -t mangle -N ${chain_name}
       echo "#TPROXY ($family)"
-      "${family}" -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}"
-      "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}"
+      "${family}" -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}" "$LOG_FILE" 2>&1
+      "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}" "$LOG_FILE" 2>&1
     fi
   done
 }
@@ -229,6 +237,7 @@ start)
     exit 1
     }
     init_ip_rules 4
+    # shellcheck disable=SC3014
     [ "$IPv6" == "true" ] && init_ip_rules 6
     init_iptables
     ;;
