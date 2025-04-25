@@ -195,6 +195,48 @@ init_iptables(){
   done
 }
 
+add_ipv4tables_exclusions() {
+    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+
+    # Список IPv4-адресов с комментариями (фильтруются автоматически)
+    ipv4_list="
+        10.0.0.0/8              # Частная сеть (LAN)
+        172.16.0.0/12           # Частная сеть (LAN)
+        192.168.0.0/16          # Частная сеть (LAN)
+        100.64.0.0/10           # CGNAT (ISP-level NAT)
+        0.0.0.0/8               # Исторически 'этот хост'
+        127.0.0.0/8             # Loopback (localhost)
+        169.254.0.0/16          # Link-local (автоконфигурация без DHCP)
+        255.255.255.255/32      # Широковещательный адрес
+        192.0.0.0/24            # IANA Special Purpose
+        192.0.2.0/24            # TEST-NET-1 (документация)
+        198.51.100.0/24         # TEST-NET-2 (документация)
+        203.0.113.0/24          # TEST-NET-3 (документация)
+        198.18.0.0/15           # Benchmarking (тестирование)
+        224.0.0.0/4             # Multicast (групповая рассылка)
+        240.0.0.0/4             # Зарезервировано для будущего
+    "
+
+    # Таблицы для обработки
+    tables="mangle nat"
+
+    # Фильтр: удаляем всё, что после '#', затем обрезаем пробелы
+    for table in $tables; do
+        echo "$ipv4_list" | while read -r line; do
+            # Удаляем комментарии и лишние пробелы
+            # sed -e 's/^[[:space:]]*//' обрезает пробелы в начале,
+            # sed -e 's/[[:space:]]*$//' — в конце строки
+            ip=$(echo "$line" | sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+            # Пропускаем пустые строки
+            if [ -n "$ip" ]; then
+                iptables -w -t "$table" -A ${chain_name} -d "$ip" -j RETURN
+                echo "[OK] Добавлено исключение: $ip (таблица: $table)"
+            fi
+        done
+    done
+}
+
+
 del_iptables() {
   chain_name="${1}"
 
@@ -253,6 +295,8 @@ start)
     # shellcheck disable=SC3014
     [ "$IPv6" == "true" ] && init_ip_rules 6
     init_iptables
+    add_ipv4tables_exclusions
+    #[ "$IPv6" == "true" ] && add_ipv6tables_exclusions
     ;;
 stop)
     del_ip_rules 4
