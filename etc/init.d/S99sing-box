@@ -182,24 +182,31 @@ init_iptables(){
       "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}" > "${LOG_FILE}" 2>&1
       "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports  ${port_forwarding_list} -j ${chain_name} > "${LOG_FILE}" 2>&1
 #      "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} > "${LOG_FILE}" 2>&1
-
-    # OUTPUT
+    fi
+    # OUTPUT nat
+    if ! "${family}" -t nat -nL ${chain_name_output} >/dev/null 2>&1; then
+      "${family}" -w -t nat -N ${chain_name_output}
       echo "#OUTPUT ($family)"
+    fi
+    # OUTPUT mangle
+    if ! "${family}" -t mangle -nL ${chain_name_output} >/dev/null 2>&1; then
       "${family}" -w -t mangle -N ${chain_name_output}
+      echo "#OUTPUT ($family)"
       # ! --uid-owner 0 — правило применяется ко всем пользователям, кроме root (UID 0).
       # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку swave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
       "${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
-
       "${family}" -w -t mangle -A ${chain_name_output} -p udp -j CONNMARK --set-mark "${table_mark_hex}"
     fi
   done
 }
 
 
-# Проверяем, существует ли цепочка .network.chain_name в таблицах mangle и nat
-check_chain_ipv4() {
 
-    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+# Проверяет существование  цепочки .network.chain_name  в таблицах mangle и nat для IPv4.
+# Если цепочка не существует в одной из таблиц, выводит ошибку и возвращает 1.
+# В противном случае возвращает 0.
+check_chain_ipv4() {
+    chain_name="${1}"
     for table in mangle nat; do
         if ! iptables -t "$table" -L ${chain_name} >/dev/null 2>&1; then
             echo "Ошибка: Цепочка ${chain_name} не существует в таблице $table. Сначала создайте её." >&2
@@ -209,11 +216,13 @@ check_chain_ipv4() {
     return 0
 }
 
+
 add_ipv4tables_exclusions() {
     chain_name="${1}"
+    echo "chain_name=$chain_name"
 
     # Проверяем существование цепочки перед началом работы
-    if ! check_chain_ipv4; then
+    if ! check_chain_ipv4 "$chain_name"; then
         exit 1
     fi
 
@@ -265,8 +274,7 @@ add_ipv4tables_exclusions() {
 
 # Проверяем, существует ли цепочка .network.chain_name в таблицах mangle и nat
 check_chain_ipv6() {
-
-    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+    chain_name="${1}"
     for table in mangle nat; do
         if ! ip6tables -t "$table" -L ${chain_name} >/dev/null 2>&1; then
             echo "Ошибка: Цепочка ${chain_name} не существует в таблице $table. Сначала создайте её." >&2
@@ -280,7 +288,7 @@ add_ipv6tables_exclusions() {
     chain_name="${1}"
 
     # Проверяем существование цепочки перед началом работы
-    if ! check_chain_ipv6; then
+    if ! check_chain_ipv6 "$chain_name"; then
         exit 1
     fi
 
@@ -320,10 +328,6 @@ add_ipv6tables_exclusions() {
     done
 }
 
-
-
-
-
 del_iptables() {
   chain_name="${1}"
 
@@ -348,7 +352,6 @@ del_iptables() {
     done
   done
 }
-
 
 del_ip_rules() {
 
@@ -383,8 +386,14 @@ start)
     [ "$IPv6" == "true" ] && init_ip_rules 6
     init_iptables
     chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+    chain_name_output="${chain_name}"_out
     add_ipv4tables_exclusions "${chain_name}"
+    add_ipv4tables_exclusions "${chain_name_output}"
+    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name') # Значение chain_name замещается внутри add_ipv4tables_exclusions
+    # shellcheck disable=SC3014
     [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name}"
+    # shellcheck disable=SC3014
+    [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name_output}"
     ;;
 stop)
     del_ip_rules 4
