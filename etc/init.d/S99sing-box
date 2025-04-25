@@ -146,6 +146,8 @@ load_kernel_modules(){
 #создания цепи и правил
 init_iptables(){
   chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+  chain_name_output="${chain_name}"_out
+  echo "${chain_name_output}"
   table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
   port_tproxy=$(echo "$js_SETTING" | jq -r '.network.port_tproxy')
   port_redirect=$(echo "$js_SETTING" | jq -r '.network.port_redirect')
@@ -153,8 +155,8 @@ init_iptables(){
   IPv6=$(echo "$js_SETTING" | jq -r '.network.IPv6 // "false"')
   port_forwarding_list=$(echo "$js_SETTING" | jq -r '.network.port_forwarding_list | join(",")')
 
-
-  echo "$chain_name"
+  echo "cat ${LOG_FILE}"
+  echo "${chain_name}"
   load_kernel_modules
 
   for family in iptables ip6tables; do
@@ -166,24 +168,35 @@ init_iptables(){
 
     # REDIRECT
     if ! "${family}" -t nat -nL ${chain_name} >/dev/null 2>&1; then
-      "${family}" -w -t nat -N ${chain_name} >"$LOG_FILE" 2>&1
+      "${family}" -w -t nat -N ${chain_name} > "${LOG_FILE}" 2>&1
       echo "#REDIRECT ($family)"
-      "${family}" -w -t nat -A ${chain_name} -p tcp -j REDIRECT --to-port "${port_redirect}" >"$LOG_FILE" 2>&1
-      "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp -m multiport --dports  ${port_forwarding_list} -j ${chain_name} >"$LOG_FILE" 2>&1
+      "${family}" -w -t nat -A ${chain_name} -p tcp -j REDIRECT --to-port "${port_redirect}" > "${LOG_FILE}" 2>&1
+      "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp -m multiport --dports  ${port_forwarding_list} -j ${chain_name} >"${LOG_FILE}" 2>&1
     fi
 
     # TPROXY
     if ! "${family}" -t mangle -nL ${chain_name} >/dev/null 2>&1; then
       "${family}" -w -t mangle -N ${chain_name}
       echo "#TPROXY ($family)"
-      "${family}" -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}" "$LOG_FILE" 2>&1
-      "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}" "$LOG_FILE" 2>&1
+      "${family}" -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}" > "${LOG_FILE}" 2>&1
+      "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}" > "${LOG_FILE}" 2>&1
+      "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports  ${port_forwarding_list} -j ${chain_name} > "${LOG_FILE}" 2>&1
+#      "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} > "${LOG_FILE}" 2>&1
+
+    # OUTPUT
+      echo "#OUTPUT ($family)"
+      "${family}" -w -t mangle -N ${chain_name_output}
+      # ! --uid-owner 0 — правило применяется ко всем пользователям, кроме root (UID 0).
+      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку swave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
+      "${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
+
+      "${family}" -w -t mangle -A ${chain_name_output} -p udp -j CONNMARK --set-mark "${table_mark_hex}"
     fi
   done
 }
 
 del_iptables() {
-  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+  chain_name="${1}"
 
   for family in iptables ip6tables; do
     for table in nat mangle; do
@@ -244,7 +257,10 @@ start)
 stop)
     del_ip_rules 4
     del_ip_rules 6
-    del_iptables
+    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+    chain_name_output="${chain_name}"_out
+    del_iptables "${chain_name}"
+    del_iptables "${chain_name_output}"
     ;;
 status)
 	if proxy_status; then

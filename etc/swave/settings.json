@@ -20,7 +20,9 @@
     "port_redirect": "60008",
     "modules":
     [
-      "xt_TPROXY.ko"
+      "xt_TPROXY.ko",
+      "xt_socket.ko",
+      "xt_owner.ko"
     ],
     "module_path": "/lib/modules/4.9-ndm-5",
     "port_forwarding_list":
