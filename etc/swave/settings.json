@@ -16,8 +16,8 @@
     "table_mark_hex": "0x4629",
     "connection_policy": "swave",
     "chain_name": "swave",
-    "port_tproxy": "60009",
     "port_redirect": "60008",
+    "port_tproxy": "60009",
     "modules":
     [
       "xt_TPROXY.ko",

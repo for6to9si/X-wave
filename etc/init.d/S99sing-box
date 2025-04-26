@@ -445,6 +445,7 @@ start)
     [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name}"
     # shellcheck disable=SC3014
     [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name_output}"
+    sing-box run -D /opt/var/sing-box -C "$(echo "$js_SETTING" | jq -r '.client.path_config')" &
     ;;
 stop)
     del_ip_rules 4
@@ -453,6 +454,7 @@ stop)
     chain_name_output="${chain_name}"_out
     del_iptables "${chain_name}"
     del_iptables "${chain_name_output}"
+    busybox killall -q -9 "$(echo "$js_SETTING" | jq -r '.client.name')"
     ;;
 status)
 	if proxy_status; then
