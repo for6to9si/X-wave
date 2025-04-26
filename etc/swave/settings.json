@@ -7,7 +7,7 @@
   "app":
   {
     "name": "swave",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "log": "/opt/var/log/swave/swava.log"
   },
   "network":
