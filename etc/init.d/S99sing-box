@@ -118,6 +118,7 @@ init_ip_rules() {
   fi
 }
 
+
 load_kernel_modules(){
 
   modules=$(echo "$js_SETTING" | jq -r '.network.modules | join(" ")')
@@ -140,7 +141,6 @@ load_kernel_modules(){
       fi
   done
 }
-
 
 
 #создания цепи и правил
@@ -201,7 +201,6 @@ init_iptables(){
 }
 
 
-
 # Проверяет существование  цепочки .network.chain_name  в таблицах mangle и nat для IPv4.
 # Если цепочка не существует в одной из таблиц, выводит ошибку и возвращает 1.
 # В противном случае возвращает 0.
@@ -216,6 +215,23 @@ check_chain_ipv4() {
     return 0
 }
 
+# Получить IPv4
+get_exclude_ip4() {
+
+    ipv4_eth=$(ip route get 9.9.9.9 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' ||
+    ip route get 1.1.1.1 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' ||
+    ip route get 8.8.8.8 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}'
+    )
+
+    [ -n "$ipv4_eth" ] && ipv4_eth="${ipv4_eth}/32 "
+
+    ipv4_exclude=$(echo "$js_SETTING" | jq -r '.network.IPv4_exclusions | join("\n")')
+    ipv4_my="$ipv4_eth
+            # Добавляем адреса своих VPN интерфейсов и исключения
+            $ipv4_exclude"
+    echo "$ipv4_my"
+
+}
 
 add_ipv4tables_exclusions() {
     chain_name="${1}"
@@ -252,6 +268,14 @@ add_ipv4tables_exclusions() {
         240.0.0.0/4             # Зарезервировано для будущего
     "
 
+    # Затем добавляем динамические адреса
+    excluded_ips=$(get_exclude_ip4)
+    if [ -n "$excluded_ips" ]; then
+        ipv4_list="$ipv4_list
+        # Объеденяем все исключения
+        $excluded_ips"
+    fi
+
     # Фильтр: удаляем всё, что после '#', затем обрезаем пробелы
     echo "$ipv4_list" | while read -r line; do
         # Удаляем комментарии и лишние пробелы
@@ -284,6 +308,24 @@ check_chain_ipv6() {
     return 0
 }
 
+# Получить IPv4
+get_exclude_ip6() {
+
+    ipv6_eth=$(ip route get 2620:fe::fe | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' ||
+    ip route get 2606:4700:4700::64 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' ||
+    ip route get 2001:4860:4860::8888 | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}'
+    )
+
+    [ -n "$ipv6_eth" ] && ipv6_eth="${ipv6_eth}/128 "
+
+    ipv6_exclude=$(echo "$js_SETTING" | jq -r '.network.IPv6_exclusions | join("\n")')
+    ipv6_my="$ipv6_eth
+            # Добавляем адреса своих VPN интерфейсов и исключения
+            $ipv6_exclude"
+    echo "$ipv6_my"
+
+}
+
 add_ipv6tables_exclusions() {
     chain_name="${1}"
 
@@ -307,6 +349,15 @@ add_ipv6tables_exclusions() {
         fe80::/10                # Link-local адреса (аналог 169.254.0.0/16)
         ff00::/8                 # Multicast (аналог 224.0.0.0/4)
     "
+
+    # Затем добавляем динамические адреса
+    excluded_ips=$(get_exclude_ip6)
+    if [ -n "$excluded_ips" ]; then
+        ipv6_list="$ipv6_list
+        # Объеденяем все исключения
+        $excluded_ips"
+    fi
+
 
     # Фильтр: удаляем всё, что после '#', затем обрезаем пробелы
     echo "$ipv6_list" | while read -r line; do
