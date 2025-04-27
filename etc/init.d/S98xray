@@ -445,8 +445,9 @@ start)
     [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name}"
     # shellcheck disable=SC3014
     [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name_output}"
-    export SSL_CERT_DIR=/opt/etc/ssl/certs
-    xray run -D /opt/var/xray -C "$(echo "$js_SETTING" | jq -r '.client.path_config')" &
+    export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
+    export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
+    xray run &
     ;;
 stop)
     del_ip_rules 4
