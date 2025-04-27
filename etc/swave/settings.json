@@ -32,7 +32,7 @@
       8080
     ],
     "DNS_forwarding": true,
-    "IPv6": true,
+    "IPv6": false,
     "IPv6_exclusions":[
       "2a01:7e00::/29", //IP адреса ваших серверов
       "2001:19f0::/32"
