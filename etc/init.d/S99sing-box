@@ -445,6 +445,7 @@ start)
     [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name}"
     # shellcheck disable=SC3014
     [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name_output}"
+    export SSL_CERT_DIR=/opt/etc/ssl/certs
     sing-box run -D /opt/var/sing-box -C "$(echo "$js_SETTING" | jq -r '.client.path_config')" &
     ;;
 stop)
