@@ -1,4 +1,4 @@
-name: Build sing-box IPK packages
+name: Build xray IPK packages
 
 on:
   workflow_dispatch:
@@ -44,7 +44,7 @@ jobs:
         mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/var/log/xwave
         mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
 
-        unzip -xzf Xray-linux-${{ matrix.arch }}.tar.gz xray -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
+        unzip -xzf Xray-linux-${{ matrix.arch }}.zip xray -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
 
 
         cp ./etc/init.d/S98xray xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
@@ -67,8 +67,8 @@ jobs:
 
     - name: Include xray license and copyright
       run: |
-        unzip -xzf Xray-linux-${{ matrix.arch }}.tar.gz LICENSE -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
-        unzip -xzf Xray-linux-${{ matrix.arch }}.tar.gz LICENSE -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray
+        unzip -xzf Xray-linux-${{ matrix.arch }}.zip LICENSE -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
+        unzip -xzf Xray-linux-${{ matrix.arch }}.zip LICENSE -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray
         ls -al ./
         ls -R ./
  
