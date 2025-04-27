@@ -1,23 +1,23 @@
 {
   "client":
   {
-    "name": "sing-box",
-    "path_config": "/opt/etc/sing-box/configs"
+    "name": "xray-core",
+    "path_config": "/opt/etc/xray/configs"
   },
   "app":
   {
-    "name": "swave",
-    "version": "0.0.5",
-    "log": "/opt/var/log/swave/swava.log"
+    "name": "xwave",
+    "version": "0.0.1",
+    "log": "/opt/var/log/xwave/xwave.log"
   },
   "network":
   {
-    "table_id": "222",
-    "table_mark_hex": "0x4629",
-    "connection_policy": "swave",
-    "chain_name": "swave",
-    "port_redirect": "60008",
-    "port_tproxy": "60009",
+    "table_id": "224",
+    "table_mark_hex": "0x3629",
+    "connection_policy": "xwave",
+    "chain_name": "xwave",
+    "port_redirect": "60018",
+    "port_tproxy": "60019",
     "modules":
     [
       "xt_TPROXY.ko",

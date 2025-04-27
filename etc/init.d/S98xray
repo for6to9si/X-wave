@@ -1,10 +1,10 @@
 #!/bin/sh
 
 # Информация о службе
-# Краткое описание: Запуск / Остановка sing-box
+# Краткое описание: Запуск / Остановка Xray
 
 # Путь к JSON-файлу с настройками
-SETTING="/opt/etc/swave/settings.json"
+SETTING="/opt/etc/xwave/settings.json"
 
 get_clean_json() {
   awk '
@@ -114,7 +114,7 @@ init_ip_rules() {
         echo "ERROR: Маршрут не установлен"
     fi
     # shellcheck disable=SC3037
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна создана" >&2
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Xwave успешна создана" >&2
   fi
 }
 
@@ -193,7 +193,7 @@ init_iptables(){
       "${family}" -w -t mangle -N ${chain_name_output}
       echo "#OUTPUT ($family)"
       # ! --uid-owner 0 — правило применяется ко всем пользователям, кроме root (UID 0).
-      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку swave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
+      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку xwave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
       "${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
       "${family}" -w -t mangle -A ${chain_name_output} -p udp -j CONNMARK --set-mark "${table_mark_hex}"
     fi
@@ -418,7 +418,7 @@ del_ip_rules() {
     busybox ip -"${ip_version}" rule del fwmark ${table_mark_hex} lookup ${table_id} >/dev/null 2>&1
     busybox ip -"${ip_version}" route flush table ${table_id} >/dev/null 2>&1
     # shellcheck disable=SC3037
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Swave успешна удалена" >&2
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Xwave успешна удалена" >&2
   fi
 }
 
@@ -429,7 +429,7 @@ case "${1}" in
 start)
     policy_mark=$(get_policy_mark) || {
     # shellcheck disable=SC3037
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику Swave на вашем роутере " >&2
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику Xwave на вашем роутере " >&2
     exit 1
     }
     init_ip_rules 4
@@ -446,7 +446,7 @@ start)
     # shellcheck disable=SC3014
     [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name_output}"
     export SSL_CERT_DIR=/opt/etc/ssl/certs
-    sing-box run -D /opt/var/sing-box -C "$(echo "$js_SETTING" | jq -r '.client.path_config')" &
+    xray run -D /opt/var/xray -C "$(echo "$js_SETTING" | jq -r '.client.path_config')" &
     ;;
 stop)
     del_ip_rules 4

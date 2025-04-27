@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [arm64, mipsle]
+        arch: [arm64-v8a, mips32le]
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -21,67 +21,67 @@ jobs:
     - name: Set up environment
       run: |
         sudo apt-get update
-        sudo apt-get install -y tar gzip jq
+        sudo apt-get install -y tar gzip jq unzip
 
     - name: Determine version
       id: version
       run: |
-        VERSION=$(curl -s https://api.github.com/repos/SagerNet/sing-box/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+        VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name' | sed 's/^v//')
         echo "version=${VERSION}" >> $GITHUB_OUTPUT
         echo "Using version: ${VERSION}"
 
-    - name: Download sing-box
+    - name: Download Xray-core
       run: |
-        wget https://github.com/SagerNet/sing-box/releases/download/v${{ steps.version.outputs.version }}/sing-box-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
+        wget https://github.com/XTLS/Xray-core/releases/download/v${{ steps.version.outputs.version }}/Xray-linux-${{ matrix.arch }}.zip
 
     - name: Create IPK package structure
       run: |
-        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
-        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d
-        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d
-        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/sing-box/configs
-        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/swave
-        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/var/log/swave
-        mkdir -p sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
+        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
+        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d
+        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d
+        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray/configs
+        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave
+        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/var/log/xwave
+        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
 
-        tar -xzf sing-box-${{ steps.version.outputs.version }}-linux-${{ matrix.arch }}.tar.gz -C sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin --strip-components=1
+        unzip -xzf Xray-linux-${{ matrix.arch }}.tar.gz xray -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
 
 
-        cp ./etc/init.d/S99sing-box sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S99sing-box
-        chmod +x sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S99sing-box
+        cp ./etc/init.d/S98xray xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
+        chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
 
-        cat > sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
-        Package: sing-box
+        cat > xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
+        Package: xray
         Depends: libc,libssp,librt,libpthread,libpthread,jq,iptables,ca-certificates
         Version: ${{ steps.version.outputs.version }}
         Architecture: mipsel-3.4
         Section: net
-        Description: A minimalistic tool to automate Sing-box setup on Keenetic router systems..
+        Description: A minimalistic tool to automate Xray setup on Keenetic router systems..
         License: GPL-3.0 license
         Maintainer: for6to9si <for6to9si@gmail.com>
         EOF
         
-        cp ./etc/ndm/netfilter.d/000-swave.sh sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
-        chmod +x sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-swave.sh
-        cp ./etc/swave/settings.json sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/swave/settings.json
+        cp ./etc/ndm/netfilter.d/000-xwave.sh xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
+        chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
+        cp ./etc/xwave/settings.json xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave/settings.json
 
-    - name: Include sing-box license and copyright
+    - name: Include xray license and copyright
       run: |
-        cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
-        cp opt/sbin/LICENSE CONTROL/
-        mv opt/sbin/LICENSE opt/etc/sing-box/
-        cd /
+        unzip -xzf Xray-linux-${{ matrix.arch }}.tar.gz LICENSE -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
+        unzip -xzf Xray-linux-${{ matrix.arch }}.tar.gz LICENSE -d -C xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray
+        ls -al ./
+        ls -R ./
  
     - name: Package IPK
       run: |
-        cd sing-box-${{ steps.version.outputs.version }}-${{ matrix.arch }}
-        tar -czf ../data.tar.gz ./opt/sbin ./opt/etc ./opt/var/log/swave
+        cd xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}
+        tar -czf ../data.tar.gz ./opt/sbin ./opt/etc ./opt/var/log/xwave
         cd ./CONTROL
         tar -czf ../../control.tar.gz *
         cd ..
         echo "2.0" > ../debian-binary
         cd ..
-        tar -czf sing-box_${{ steps.version.outputs.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
+        tar -czf xray_${{ steps.version.outputs.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
         
     - name: Store build timestamp
       run: echo "BUILD_TIME=$(date +'%T')" >> $GITHUB_ENV
@@ -92,7 +92,7 @@ jobs:
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: sing-box-${{ matrix.arch }} 
+        name: xray-${{ matrix.arch }}
         path: ./*.ipk
         if-no-files-found: error
 
@@ -130,7 +130,7 @@ jobs:
             }' "$1"
           }
           
-          js_SETTING=$(get_clean_json etc/swave/settings.json | jq -c '.' 2>/dev/null)
+          js_SETTING=$(get_clean_json etc/xwave/settings.json | jq -c '.' 2>/dev/null)
           TAG_NAME="v$(echo "$js_SETTING" | jq -r '.app.version')"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
 
@@ -166,7 +166,7 @@ jobs:
           echo "Changelog:"
           cat changelog.txt
 
-          gh release create "$TAG" artifacts/sing-box-*/sing-box_*.ipk \
+          gh release create "$TAG" artifacts/xray-*/xray_*.ipk \
             --repo "$GITHUB_REPOSITORY" \
             --title "Release $TAG" \
             --notes-file changelog.txt \

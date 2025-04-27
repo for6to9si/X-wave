@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Путь к JSON-файлу с настройками
-SETTING="/opt/etc/swave/settings.json"
+SETTING="/opt/etc/xwave/settings.json"
 
 get_clean_json() {
   awk '
@@ -144,7 +144,7 @@ init_iptables(){
       "${family}" -w -t mangle -N ${chain_name_output}
       echo "#OUTPUT ($family)"
       # ! --uid-owner 0 — правило применяется ко всем пользователям, кроме root (UID 0).
-      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку swave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
+      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку xwave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
       "${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
       "${family}" -w -t mangle -A ${chain_name_output} -p udp -j CONNMARK --set-mark "${table_mark_hex}"
     fi
@@ -344,4 +344,4 @@ chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name') # Значени�
 [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name_output}"
 
 
-logger -p notice -t "$(basename "$0")" "Swave run"
+logger -p notice -t "$(basename "$0")" "Xwave run"
