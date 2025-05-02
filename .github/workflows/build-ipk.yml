@@ -176,15 +176,16 @@ jobs:
           echo "Changelog:"
           cat changelog.txt
 
-          gh release create "$TAG" artifacts/xray-*/xray_*.ipk \
             if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+              gh release create "$TAG" artifacts/xray-*/xray_*.ipk \
               --repo "$GITHUB_REPOSITORY" \
               --title "Release $TAG" \
               --notes-file changelog.txt \
               --prerelease
             else
+              gh release create "$TAG" artifacts/xray-*/xray_*.ipk \
               --repo "$GITHUB_REPOSITORY" \
               --title "Release $TAG" \
-              --notes-file changelog.txt \
+              --notes-file changelog.txt 
             fi
 
