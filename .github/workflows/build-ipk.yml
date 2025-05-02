@@ -2,6 +2,15 @@ name: Build xray IPK packages
 
 on:
   workflow_dispatch:
+    inputs:
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
       
 permissions:
   contents: write
@@ -168,9 +177,14 @@ jobs:
           cat changelog.txt
 
           gh release create "$TAG" artifacts/xray-*/xray_*.ipk \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Release $TAG" \
-            --notes-file changelog.txt \
-            --prerelease
-
+            if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Release $TAG" \
+              --notes-file changelog.txt \
+              --prerelease
+            else
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Release $TAG" \
+              --notes-file changelog.txt \
+            fi
 
