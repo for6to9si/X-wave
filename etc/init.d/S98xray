@@ -729,6 +729,17 @@ firewall_ip6tables(){
   firewall_ip6tables_mangle
 }
 
+database_updates(){
+  json='{
+  "geosite_zkeen.dat": "https://github.com/jameszeroX/zkeen-domains/releases/latest/download/zkeen.dat",
+  "geosite_antifilter.dat": "https://github.com/Skrill0/AntiFilter-Domains/releases/latest/download/geosite.dat",
+  "geosite_v2fly.dat": "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
+}'
+
+# Вывод ключей и значений с помощью jq
+  echo "$json" | jq -r 'to_entries[] | "\(.key) => \(.value)"'
+}
+
 # Менеджер команд
 case $ACTION in
   start)
@@ -817,6 +828,9 @@ case $ACTION in
       if is_running; then
         firewall_ip6tables_mangle
       fi
+      ;;
+  refresh)
+      database_updates
       ;;
   *)
       echo -e "  Команды: ${color_green}start${color_reset} | ${color_red}stop${color_reset} | ${color_yellow}restart${color_reset} | ${color_blue}backup${color_reset} | status"

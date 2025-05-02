@@ -24,31 +24,48 @@
       443,
       8080
     ],
-    "port_forwarding_range":[
+    "port_forwarding_range":
+    [
       "1024:1055",
       "1000:1099"
     ],
     "DNS_forwarding": true,
     "IPv6": false,
-    "IPv6_exclusions":[
-      "2a02:6b8::2:242/128", //IP адреса ваших корпоративных серверов
+    "IPv6_exclusions":
+    [
+      "2a02:6b8::2:242/128",
       "2a02:6b8:a::a/128"
     ],
-    "IPv4_exclusions":[
-      "95.173.136.0/24",   //IP адреса ваших корпоративных серверов
+    "IPv4_exclusions":
+    [
+      "95.173.136.0/24",
       "95.173.137.0/24",
       "95.173.138.0/24"
     ],
-    "dns":{
+    "dns":
+    {
       "dns_filter": true,
-      "IPv4":[
+      "IPv4":
+      [
         "10.0.0.0/8",
         "192.168.0.0/16"
       ],
-      "IPv6":[
+      "IPv6":
+      [
         "fd00::/8",
         "fe80::/10"
       ]
+    }
+  },
+  "database":
+  {
+    "download": true,
+    "time_update": "03:00",
+    "data":
+    {
+      "geosite_zkeen.dat": "https://github.com/jameszeroX/zkeen-domains/releases/latest/download/zkeen.dat",
+      "geosite_antifilter.dat": "https://github.com/Skrill0/AntiFilter-Domains/releases/latest/download/geosite.dat",
+      "geosite_v2fly.dat": "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
     }
   }
 }
