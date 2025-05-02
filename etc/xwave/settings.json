@@ -1,13 +1,13 @@
 {
   "client":
   {
-    "name": "xray-core",
+    "name": "xray",
     "path_config": "/opt/etc/xray/configs"
   },
   "app":
   {
     "name": "xwave",
-    "version": "0.0.1",
+    "version": "0.0.3",
     "log": "/opt/var/log/xwave/xwave.log"
   },
   "network":

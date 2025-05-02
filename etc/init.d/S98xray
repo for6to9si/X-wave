@@ -1,10 +1,26 @@
 #!/bin/sh
 
-# Информация о службе
-# Краткое описание: Запуск / Остановка Xray
+ENABLED=yes
+DEBUG=true
+
+# Включение трассировки (если нужно)
+#[ "$DEBUG" = "true" ] && set -x
+
+# Выключение трассировки (если включали)
+[ "$DEBUG" = "true" ] && set +x
+
 
 # Путь к JSON-файлу с настройками
-SETTING="/opt/etc/xwave/settings.json"
+if [ ! -f /opt/etc/swave/settings.json ]; then
+    echo "Файл настроек /opt/etc/swave/settings.json не найден."
+    echo "Пожалуйста, ознакомьтесь с примером настроек: /opt/etc/swave/example.json"
+    echo "Отредактируйте его в соответствии с вашими требованиями,"
+    echo "затем переместите в нужное место командой:"
+    echo "  mv /opt/etc/swave/example.json /opt/etc/swave/settings.json"
+    exit 1
+else
+    SETTING="/opt/etc/swave/settings.json"
+fi
 
 get_clean_json() {
   awk '
@@ -28,12 +44,36 @@ get_clean_json() {
   }' "$1"
 }
 
+# Парсинг JSON
 js_SETTING=$(get_clean_json "$SETTING" | jq -c '.' 2>/dev/null)
+if [ $? -ne 0 ] || [ -z "$js_SETTING" ]; then
+  echo "Ошибка: файл '$SETTING' содержит некорректный JSON." >&2
+  exit 1
+fi
+
+DEBUG_LOG=$(echo "$js_SETTING" | jq -r '.app.log')
+
+# Функция для отладки
+debug() {
+    [ "$DEBUG" = "true" ] && {
+        _YELLOW='\033[33m'
+        _NC='\033[0m'  # No Color
+        echo -e "${_YELLOW}[DEBUG]${_NC} $*"          # Вывод в терминал
+    #    logger -p debug -t "$(basename "$0")" "$*"  # И в syslog (опционально)
+    #    echo "$(date) $*" >> "$DEBUG_LOG"           # И в файл (опционально)
+    }
+}
+
+# Пример использования
+#chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+#debug "Наименование цепочки ${chain_name}"
+
 
 # Цвета
 color_green="\033[32m"    # Успешное выполнение, позитивные сообщения
 color_red="\033[31m"      # Критические ошибки, опасные действия
 color_yellow="\033[33m"   # Предупреждения, не критичные проблемы
+color_blue="\033[34m"
 color_reset="\033[0m"     # Сброс цвета к стандартному
 
 IP_RULES_LOG=$(echo "$js_SETTING" | jq -r '.app.log')
@@ -41,13 +81,75 @@ IP_RULES_LOG=$(echo "$js_SETTING" | jq -r '.app.log')
 # Если переменная не задана, используем /dev/null
 LOG_FILE="${IP_RULES_LOG:-/dev/null}"
 
+PROCS=$(echo "$js_SETTING" | jq -r '.client.name')
+PATH=/opt/sbin:/opt/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ACTION=$1
+CALLER=$2
+
+
+is_running() {
+	PID_RUNNING=$(pgrep -nx "$PROCS" 2>/dev/null)
+
+	if [ -z "$PID_RUNNING" ]; then
+		return 1
+	fi
+
+	return 0
+}
+
+wait_for_iptables_tables() {
+    TIMEOUT="${1:-20}"
+    INTERVAL=1
+    ELAPSED=0
+    client=$(echo "$js_SETTING" | jq -r '.client.name')
+    logger -t "$(basename "$0")" "[${client}] Ожидание доступности iptables (таблицы nat и mangle)..."
+
+    while :; do
+        NAT_READY=false
+        MANGLE_READY=false
+
+        iptables -t nat -S >/dev/null 2>&1 && NAT_READY=true
+        iptables -t mangle -S >/dev/null 2>&1 && MANGLE_READY=true
+
+        if $NAT_READY && $MANGLE_READY; then
+            logger -t "$(basename "$0")" "[${client}] iptables таблицы nat и mangle доступны"
+            return 0
+        fi
+
+        sleep "$INTERVAL"
+        ELAPSED=$((ELAPSED + INTERVAL))
+        if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+            logger -t "$(basename "$0")" "[${client}] iptables таблицы не стали доступны за $TIMEOUT сек"
+            return 1
+        fi
+    done
+}
+
+check_iptables_tproxy() {
+    TEST_CHAIN=$(echo "$js_SETTING" | jq -r '.network.chain_name // "TPROXY_TEST_CHAIN"')
+
+    # Создаем временную цепочку в таблице mangle
+    iptables -t mangle -N "${TEST_CHAIN}" 2>/dev/null
+
+    # Пробуем безопасно вставить TPROXY+SOCKET правило
+    if iptables -t mangle -A "${TEST_CHAIN}" -p tcp -m socket -j TPROXY --on-port 12345 --tproxy-mark 0x1/0x1 2>/dev/null; then
+        debug "[OK] iptables поддерживает TPROXY и SOCKET"
+        iptables -t mangle -F "${TEST_CHAIN}"
+        iptables -t mangle -X "${TEST_CHAIN}"
+        return 0
+    else
+        echo "[-] iptables не поддерживает TPROXY и/или SOCKET"
+        iptables -t mangle -F "${TEST_CHAIN}" 2>/dev/null
+        iptables -t mangle -X "${TEST_CHAIN}" 2>/dev/null
+        return 1
+    fi
+}
 
 get_policy_mark() {
 
   # Определяем коды цветов (используем $'...' для интерпретации escape-последовательностей)
   _color_red=$'\033[31m'
   _color_reset=$'\033[0m'
-  _test="test1"
 
   policy_mark=$(
       curl -kfsS "localhost:79/rci/show/ip/policy" \
@@ -75,23 +177,17 @@ get_policy_mark() {
 init_ip_rules() {
 
   ip_version="${1}"
-  echo "$ip_version"
-
   table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
   table_id=$(echo "$js_SETTING" | jq -r '.network.table_id')
-
-  echo "table_mark=${table_mark_hex}"
-  echo "table_id=${table_id}"
 
   # Проверка, существует ли правило
   if ! busybox ip -"${ip_version}" rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
 
-  policy_mark=$(get_policy_mark)
+    policy_mark=$(get_policy_mark)
 
     # Если задан маркер политики, ищем связанную таблицу
     if [ -n "${policy_mark}" ]; then
       policy_table=$(busybox ip rule show | awk -v policy="${policy_mark}" '$0 ~ policy && /lookup/ && !/blackhole/ {print $NF}')
-      echo "policy_table=${policy_table}"
     fi
 
     # Добавляем правило и таблицу маршрутов
@@ -107,111 +203,329 @@ init_ip_rules() {
         if [ -n "${matching_main_route}" ]; then
           busybox ip -"${ip_version}" route add table "${table_id}" ${matching_main_route} >/dev/null 2>&1
         else
-          echo "WARN: Маршрут '${route}' не найден в основной таблице" >&2
+          debug "WARN: Маршрут '${route}' не найден в основной таблице" >&2
         fi
       done
     else
-        echo "ERROR: Маршрут не установлен"
+        debug "ERROR: Маршрут не установлен"
     fi
+    appname=$(echo "$js_SETTING" | jq -r '.app.name')
     # shellcheck disable=SC3037
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Xwave успешна создана" >&2
+    debug "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Маршрут ${appname} для IPv${ip_version} успешна создана" >&2
   fi
 }
 
+del_iptables() {
 
-load_kernel_modules(){
+  chain_name="${1}"
+  for family in iptables ip6tables; do
+    for table in nat mangle; do
+      debug "[*] Проверка таблицы '$table' (${family})"
+      if $family -t "$table" -S 2>/dev/null | grep -qP "^-N ${chain_name}\b"; then
+        debug "[+] Очистка цепочки '${chain_name}' в таблице '$table' (${family})"
+        $family -t "$table" -F "${chain_name}"
 
-  modules=$(echo "$js_SETTING" | jq -r '.network.modules | join(" ")')
-  modules_path=$(echo "$js_SETTING" | jq -r '.network.module_path')
+        debug "[+] Удаление переходов в цепочку '${chain_name}' в таблице '$table' (${family})"
+        while $family -t "$table" -S 2>/dev/null | grep -P "^-A .+ -j ${chain_name}\b" >/dev/null; do
+          local rule=$($family -t "$table" -S 2>/dev/null | grep -P "^-A .+ -j ${chain_name}\b" | head -n 1)
+          eval $family -t "$table" ${rule/-A/-D}
+        done
 
-  for mod in $modules; do
-      modname=$(basename "$mod" .ko)
-      if lsmod | grep -q "^$modname"; then
-          continue
+        debug "[+] Удаление цепочки '${chain_name}' в таблице '$table' (${family})"
+        $family -t "$table" -X "${chain_name}"
       else
-          echo "Модуль $modname не загружен. Пытаюсь загрузить..."
-          logger -t "$(basename "$0")" "Модуль $modname не загружен. Пытаюсь загрузить..."
-          if insmod "$modules_path/$mod"; then
-              echo "Модуль $modname успешно загружен."
-              logger -t "$(basename "$0")" "Модуль $modname успешно загружен."
-          else
-              echo "Ошибка загрузки модуля $modname из $modules_path/$mod"
-              logger -t "$(basename "$0")" "Ошибка загрузки модуля $modname из $modules_path/$mod"
-          fi
+        debug "[!] Цепочка '${chain_name}' не найдена или не является пользовательской в таблице '$table' (${family})"
       fi
+    done
   done
 }
 
+del_ip_rules() {
 
-#создания цепи и правил
-init_iptables(){
-  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
-  chain_name_output="${chain_name}"_out
-  echo "${chain_name_output}"
+  ip_version="${1}"
+
   table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
-  port_tproxy=$(echo "$js_SETTING" | jq -r '.network.port_tproxy')
-  port_redirect=$(echo "$js_SETTING" | jq -r '.network.port_redirect')
-  policy_mark=$(get_policy_mark)
-  IPv6=$(echo "$js_SETTING" | jq -r '.network.IPv6 // "false"')
-  port_forwarding_list=$(echo "$js_SETTING" | jq -r '.network.port_forwarding_list | join(",")')
+  table_id=$(echo "$js_SETTING" | jq -r '.network.table_id')
 
-  echo "cat ${LOG_FILE}"
-  echo "${chain_name}"
-  load_kernel_modules
 
-  for family in iptables ip6tables; do
-    [ "$family" = "ip6tables" ] && [ "$IPv6" != "true" ] && continue
+  if busybox ip -"${ip_version}" rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
+    busybox ip -"${ip_version}" rule del fwmark ${table_mark_hex} lookup ${table_id} >/dev/null 2>&1
+    busybox ip -"${ip_version}" route flush table ${table_id} >/dev/null 2>&1
+    appname=$(echo "$js_SETTING" | jq -r '.app.name')
+    # shellcheck disable=SC3037
+    debug "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица IPv${ip_version} маршрута для ${appname} успешна удалена" >&2
+  fi
+}
+
+backup_config_xray() {
+
+    SOURCE_DIR="$(echo "$js_SETTING" | jq -r '.client.path_config')"
+    BACKUP_BASE_DIR="/opt/backups/xray"
+    TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+    BACKUP_DIR="${BACKUP_BASE_DIR}/${TIMESTAMP}"
+
+    # Проверяем существование базовой директории
+    if [ ! -d "$BACKUP_BASE_DIR" ]; then
+        echo "Директория $BACKUP_BASE_DIR не существует."
+        echo -n "Хотите создать её? (y/n): "
+        read answer
+        if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
+            mkdir -p "$BACKUP_BASE_DIR"
+            echo "Директория создана: $BACKUP_BASE_DIR"
+        else
+            echo "Операция отменена пользователем."
+            return 1
+        fi
+    fi
+
+    # Создаём папку для нового бэкапа
+    mkdir -p "$BACKUP_DIR"
+
+    # Копируем файлы
+    cp -r "$SOURCE_DIR/"* "$BACKUP_DIR/"
+
+    echo "Бэкап успешно создан в: $BACKUP_DIR"
+}
+
+IPv6=$(echo "$js_SETTING" | jq -r '.network.IPv6 // "false"')
+
+if ip -6 addr show scope global | grep -q inet6; then
+    debug "IPv6-адреса настроены (глобальные)"
+else
+    debug "IPv6-адреса отсутствуют или отключены"
+    IPv6=false
+fi
+
+kernel_modules_load() {
+    KERNEL=$(uname -r)
+
+    for mod in xt_TPROXY xt_socket; do
+        debug "[INFO] Checking for module: $mod"
+
+        if lsmod | grep -q "^$mod"; then
+            debug "[OK] $mod already loaded"
+            continue
+        fi
+
+        mod_file=$(find /lib/modules/"$KERNEL" -name "$mod.ko*" 2>/dev/null | head -n1)
+
+        if [ -n "$mod_file" ]; then
+            logger -t "$(basename "$0")" "[INFO] Found $mod at $mod_file"
+            if insmod "$mod_file" 2>/dev/null; then
+                logger -t "$(basename "$0")" "[OK] $mod loaded via insmod"
+                continue
+            else
+                logger -t "$(basename "$0")" "[WARN] insmod failed for $mod"
+            fi
+        else
+            logger -t "$(basename "$0")" "[WARN] No .ko file found for $mod"
+        fi
+
+        if modprobe "$mod" --first-time 2>/dev/null; then
+            logger -t "$(basename "$0")" "[OK] $mod loaded via modprobe"
+        else
+            if lsmod | grep -q "^$mod"; then
+                logger -t "$(basename "$0")" "[OK] $mod is already loaded (modprobe failed because of that)"
+            else
+                logger -t "$(basename "$0")" "[FAIL] Failed to load $mod"
+            fi
+        fi
+    done
+}
+
+init_dns_tables(){
+
+    # Проверка наличия цепочек и включенного dns_filter
+    if [ "${1}" = "iptables" ] \
+    && [ "${2}" = "nat" ] \
+    && iptables -t nat -nL "${chain_name}" >/dev/null 2>&1 \
+    && echo "$js_SETTING" | jq -e '.network.dns.dns_filter == true' >/dev/null
+    then
+        # IPv4
+        for ip in $(echo "$js_SETTING" | jq -r '.network.dns.IPv4[]'); do
+            if ! iptables -t nat -C "${chain_name}" -d "$ip" -p tcp -m tcp ! --dport 53 -j RETURN 2>/dev/null; then
+                iptables -w -t nat    -A "${chain_name}" -d "$ip" -p tcp -m tcp ! --dport 53 -j RETURN
+            fi
+            if ! iptables -t nat -C "${chain_name}" -d "$ip" -p udp -m udp --dport 53 -j RETURN 2>/dev/null; then
+                iptables -w -t nat    -A "${chain_name}" -d "$ip" -p udp -m udp --dport 53 -j RETURN
+            fi
+            debug "DNS таблица цепи ${chain_name} для ${ip} создана"
+        done
+    fi
+
+    if [ "${1}" = "iptables" ] \
+    && [ "${2}" = "mangle" ] \
+    && iptables -t mangle -nL "${chain_name}" >/dev/null 2>&1 \
+    && echo "$js_SETTING" | jq -e '.network.dns.dns_filter == true' >/dev/null
+    then
+        # IPv4
+        for ip in $(echo "$js_SETTING" | jq -r '.network.dns.IPv4[]'); do
+            if ! iptables -t mangle -C "${chain_name}" -d "$ip" -p tcp -m tcp --dport 53 -j RETURN 2>/dev/null; then
+                iptables -w -t mangle -A "${chain_name}" -d "$ip" -p tcp -m tcp --dport 53 -j RETURN
+            fi
+            if ! iptables -t mangle -C "${chain_name}" -d "$ip" -p udp -m udp ! --dport 53 -j RETURN 2>/dev/null; then
+                iptables -w -t mangle -A "${chain_name}" -d "$ip" -p udp -m udp ! --dport 53 -j RETURN
+            fi
+            debug "DNS таблица цепи ${chain_name} для ${ip} создана"
+        done
+    fi
+
+    if [ "${1}" = "ip6tables" ] \
+    && [ "${2}" = "nat" ] \
+    && ip6tables -t nat -nL "${chain_name}" >/dev/null 2>&1 \
+    && echo "$js_SETTING" | jq -e '.network.dns.dns_filter == true' >/dev/null
+    then
+        # Проверка, разрешён ли IPv6
+
+        if [ "$IPv6" != "false" ]; then
+            for ip6 in $(echo "$js_SETTING" | jq -r '.network.dns.IPv6[]'); do
+                if ! ip6tables -t nat -C "${chain_name}" -d "$ip6" -p tcp -m tcp ! --dport 53 -j RETURN 2>/dev/null; then
+                    ip6tables -w -t nat    -A "${chain_name}" -d "$ip6" -p tcp -m tcp ! --dport 53 -j RETURN
+                fi
+                if ! ip6tables -t nat -C "${chain_name}" -d "$ip6" -p udp -m udp --dport 53 -j RETURN 2>/dev/null; then
+                    ip6tables -w -t nat    -A "${chain_name}" -d "$ip6" -p udp -m udp --dport 53 -j RETURN
+                fi
+                debug "DNS таблица цепи ${chain_name} для ${ip6} создана"
+            done
+        fi
+    fi
+
+    if [ "${1}" = "ip6tables" ] \
+    && [ "${2}" = "mangle" ] \
+    && ip6tables -t mangle -nL "${chain_name}" >/dev/null 2>&1 \
+    && echo "$js_SETTING" | jq -e '.network.dns.dns_filter == true' >/dev/null
+    then
+        # Проверка, разрешён ли IPv6
+
+        if [ "$IPv6" != "false" ]; then
+            for ip6 in $(echo "$js_SETTING" | jq -r '.network.dns.IPv6[]'); do
+                if ! ip6tables -t mangle -C "${chain_name}" -d "$ip6" -p tcp -m tcp --dport 53 -j RETURN 2>/dev/null; then
+                    ip6tables -w -t mangle -A "${chain_name}" -d "$ip6" -p tcp -m tcp --dport 53 -j RETURN
+                fi
+                if ! ip6tables -t mangle -C "${chain_name}" -d "$ip6" -p udp -m udp ! --dport 53 -j RETURN 2>/dev/null; then
+                    ip6tables -w -t mangle -A "${chain_name}" -d "$ip6" -p udp -m udp ! --dport 53 -j RETURN
+                fi
+                debug "DNS таблица цепи ${chain_name} для ${ip6} создана"
+            done
+        fi
+    fi
+
+}
+
+init_tables_nat(){
+    family="${1}"
+    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+    chain_name_output="${chain_name}"_out
+    table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
+    port_tproxy=$(echo "$js_SETTING" | jq -r '.network.port_tproxy')
+    port_redirect=$(echo "$js_SETTING" | jq -r '.network.port_redirect')
+    policy_mark=$(get_policy_mark)
+    port_list=$(echo "$js_SETTING" | jq -r '.network.port_forwarding_list | join(",")')
+    # Проверяем, если список пуст
+    if [ -z "$port_list" ]; then
+    echo "Ошибка: Нет портов в port_forwarding_list!" >&2
+    exit 1
+    fi
+    if echo "$js_SETTING" | jq -e '.network.dns.dns_filter' > /dev/null; then
+    port_list="53,${port_list}"
+    fi
+    # Безопасно достаём диапазоны портов или пустой список
+    port_ranges=$(echo "$js_SETTING" | jq -r '.network.port_forwarding_range // [] | .[]')
 
     # Используем ::1 для ip6tables, иначе 127.0.0.1
     loopback_ip="127.0.0.1"
     [ "$family" = "ip6tables" ] && loopback_ip="::1"
 
-    # REDIRECT
+        # REDIRECT
     if ! "${family}" -t nat -nL ${chain_name} >/dev/null 2>&1; then
-      "${family}" -w -t nat -N ${chain_name} > "${LOG_FILE}" 2>&1
-      echo "#REDIRECT ($family)"
-      "${family}" -w -t nat -A ${chain_name} -p tcp -j REDIRECT --to-port "${port_redirect}" > "${LOG_FILE}" 2>&1
-      "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp -m multiport --dports  ${port_forwarding_list} -j ${chain_name} >"${LOG_FILE}" 2>&1
+      "${family}" -w -t nat -N ${chain_name} >> "${LOG_FILE}" 2>&1
+      debug "#REDIRECT ($family)"
+      "${family}" -w -t nat -A ${chain_name} -p tcp -j REDIRECT --to-port "${port_redirect}" >> "${LOG_FILE}" 2>&1
+      "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp -m multiport --dports  ${port_list} -j ${chain_name} >>"${LOG_FILE}" 2>&1
+      echo "$port_ranges" | while read -r range; do
+        [ -n "$range" ] || continue
+        "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp --dport "$range" -j ${chain_name}
+      done
     fi
+        #DNS
+    init_dns_tables "$family" "nat"
+
+        # OUTPUT nat
+    if ! "${family}" -t nat -nL ${chain_name_output} >/dev/null 2>&1; then
+      "${family}" -w -t nat -N ${chain_name_output}
+      debug "#OUTPUT nat ($family)"
+    fi
+
+}
+
+
+#создания цепи и правил
+init_tables_mangle(){
+
+    family="${1}"
+    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+    chain_name_output="${chain_name}"_out
+    table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
+    port_tproxy=$(echo "$js_SETTING" | jq -r '.network.port_tproxy')
+    port_redirect=$(echo "$js_SETTING" | jq -r '.network.port_redirect')
+    policy_mark=$(get_policy_mark)
+    port_list=$(echo "$js_SETTING" | jq -r '.network.port_forwarding_list | join(",")')
+    # Проверяем, если список пуст
+    if [ -z "$port_list" ]; then
+    echo "Ошибка: Нет портов в port_forwarding_list!" >&2
+    exit 1
+    fi
+    if echo "$js_SETTING" | jq -e '.network.dns.dns_filter' > /dev/null; then
+    port_list="53,${port_list}"
+    fi
+    # Безопасно достаём диапазоны портов или пустой список
+    port_ranges=$(echo "$js_SETTING" | jq -r '.network.port_forwarding_range // [] | .[]')
+
+    # Используем ::1 для ip6tables, иначе 127.0.0.1
+    loopback_ip="127.0.0.1"
+    [ "$family" = "ip6tables" ] && loopback_ip="::1"
 
     # TPROXY
     if ! "${family}" -t mangle -nL ${chain_name} >/dev/null 2>&1; then
       "${family}" -w -t mangle -N ${chain_name}
-      echo "#TPROXY ($family)"
-      "${family}" -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}" > "${LOG_FILE}" 2>&1
-      "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}" > "${LOG_FILE}" 2>&1
-      "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports  ${port_forwarding_list} -j ${chain_name} > "${LOG_FILE}" 2>&1
-#      "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} > "${LOG_FILE}" 2>&1
+      debug "#TPROXY ($family)"
+      "${family}" -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}" >> "${LOG_FILE}" 2>&1
+      "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}" >> "${LOG_FILE}" 2>&1
+      "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports  ${port_list} -j ${chain_name} >> "${LOG_FILE}" 2>&1
+    #   "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} >> "${LOG_FILE}" 2>&1
+      echo "$port_ranges" | while read -r range; do
+        [ -n "$range" ] || continue
+        "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp --dport "$range" -j ${chain_name}
+      done
     fi
-    # OUTPUT nat
-    if ! "${family}" -t nat -nL ${chain_name_output} >/dev/null 2>&1; then
-      "${family}" -w -t nat -N ${chain_name_output}
-      echo "#OUTPUT ($family)"
-    fi
+
+    #DNS
+    init_dns_tables "$family" "mangle"
+
     # OUTPUT mangle
     if ! "${family}" -t mangle -nL ${chain_name_output} >/dev/null 2>&1; then
       "${family}" -w -t mangle -N ${chain_name_output}
-      echo "#OUTPUT ($family)"
+      debug "#OUTPUT mangle ($family)"
       # ! --uid-owner 0 — правило применяется ко всем пользователям, кроме root (UID 0).
-      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку xwave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
-      "${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
+      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку swave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
+      #"${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
+      "${family}" -w -t mangle -A OUTPUT -p udp -m multiport --dports  ${port_list} -m conntrack ! --ctstate INVALID -j ${chain_name_output}
       "${family}" -w -t mangle -A ${chain_name_output} -p udp -j CONNMARK --set-mark "${table_mark_hex}"
+      echo "$port_ranges" | while read -r range; do
+        [ -n "$range" ] || continue
+        "${family}" -w -t mangle -A OUTPUT -p udp --dport "$range" -m conntrack ! --ctstate INVALID -j ${chain_name_output}
+      done
     fi
-  done
 }
-
 
 # Проверяет существование  цепочки .network.chain_name  в таблицах mangle и nat для IPv4.
 # Если цепочка не существует в одной из таблиц, выводит ошибку и возвращает 1.
 # В противном случае возвращает 0.
 check_chain_ipv4() {
-    chain_name="${1}"
-    for table in mangle nat; do
-        if ! iptables -t "$table" -L ${chain_name} >/dev/null 2>&1; then
-            echo "Ошибка: Цепочка ${chain_name} не существует в таблице $table. Сначала создайте её." >&2
-            return 1
-        fi
-    done
+    if ! iptables -t "${2}" -nL "${1}" > /dev/null 2>&1; then
+        debug "Ошибка: Цепочка ${1} не существует в таблице $table. Сначала создайте её." >&2
+        return 1
+    fi
     return 0
 }
 
@@ -234,11 +548,9 @@ get_exclude_ip4() {
 }
 
 add_ipv4tables_exclusions() {
-    chain_name="${1}"
-    echo "chain_name=$chain_name"
 
     # Проверяем существование цепочки перед началом работы
-    if ! check_chain_ipv4 "$chain_name"; then
+    if ! check_chain_ipv4 "${1}" "${2}"; then
         exit 1
     fi
 
@@ -267,7 +579,6 @@ add_ipv4tables_exclusions() {
         224.0.0.0/4             # Multicast (групповая рассылка)
         240.0.0.0/4             # Зарезервировано для будущего
     "
-
     # Затем добавляем динамические адреса
     excluded_ips=$(get_exclude_ip4)
     if [ -n "$excluded_ips" ]; then
@@ -284,27 +595,23 @@ add_ipv4tables_exclusions() {
         ip=$(echo "$line" | sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
         [ -z "$ip" ] && continue  # Пропускаем пустые строки
 
-        for table in mangle nat; do
-            # Проверяем, не существует ли правило уже
-            if ! iptables -w -t "$table" -C ${chain_name} -d "$ip" -j RETURN >/dev/null 2>&1; then
-                iptables -w -t "$table" -A ${chain_name} -d "$ip" -j RETURN
-                echo "[OK] Добавлено исключение: $ip (таблица: $table)"
-            else
-                echo "[Пропуск] Правило для $ip уже существует в таблице $table"
-            fi
-        done
+        # Проверяем, не существует ли правило уже
+        if ! iptables -w -t "${2}" -C "${1}" -d "$ip" -j RETURN >/dev/null 2>&1; then
+            iptables -w -t "${2}" -A "${1}" -d "$ip" -j RETURN >> "${LOG_FILE}" 2>&1
+            debug "[OK] Добавлено исключение: $ip (таблица: $2)"
+        else
+            debug "[Пропуск] Правило для $ip уже существует в таблице $2"
+        fi
     done
 }
 
 # Проверяем, существует ли цепочка .network.chain_name в таблицах mangle и nat
 check_chain_ipv6() {
-    chain_name="${1}"
-    for table in mangle nat; do
-        if ! ip6tables -t "$table" -L ${chain_name} >/dev/null 2>&1; then
-            echo "Ошибка: Цепочка ${chain_name} не существует в таблице $table. Сначала создайте её." >&2
-            return 1
-        fi
-    done
+
+    if ! ip6tables -w -t "${2}" -nL "${1}" >/dev/null 2>&1; then
+        debug "Ошибка: Цепочка ${1} не существует в таблице $table. Сначала создайте её." >&2
+        return 1
+    fi
     return 0
 }
 
@@ -327,10 +634,9 @@ get_exclude_ip6() {
 }
 
 add_ipv6tables_exclusions() {
-    chain_name="${1}"
 
     # Проверяем существование цепочки перед началом работы
-    if ! check_chain_ipv6 "$chain_name"; then
+    if ! check_chain_ipv6 "${1}" "${2}"; then
         exit 1
     fi
 
@@ -367,111 +673,154 @@ add_ipv6tables_exclusions() {
         ip=$(echo "$line" | sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
         [ -z "$ip" ] && continue  # Пропускаем пустые строки
 
-        for table in mangle nat; do
-            # Проверяем, не существует ли правило уже
-            if ! ip6tables -w -t "$table" -C ${chain_name} -d "$ip" -j RETURN >/dev/null 2>&1; then
-                ip6tables -w -t "$table" -A ${chain_name} -d "$ip" -j RETURN
-                echo "[OK] Добавлено исключение: $ip (таблица: $table)"
-            else
-                echo "[Пропуск] Правило для $ip уже существует в таблице $table"
-            fi
-        done
+        # Проверяем, не существует ли правило уже
+        if ! ip6tables -w -t "${2}" -C "${1}" -d "$ip" -j RETURN >/dev/null 2>&1; then
+            ip6tables -w -t "${2}" -A "${1}" -d "$ip" -j RETURN >> "${LOG_FILE}" 2>&1
+            debug "[OK] Добавлено исключение: $ip (таблица: $2)"
+        else
+            debug "[Пропуск] Правило для $ip уже существует в таблице $2"
+        fi
     done
 }
 
-del_iptables() {
-  chain_name="${1}"
-
-  for family in iptables ip6tables; do
-    for table in nat mangle; do
-      echo "[*] Проверка таблицы '$table' (${family})"
-      if $family -t "$table" -S 2>/dev/null | grep -qP "^-N ${chain_name}\b"; then
-        echo "[+] Очистка цепочки '${chain_name}' в таблице '$table' (${family})"
-        $family -t "$table" -F "${chain_name}"
-
-        echo "[+] Удаление переходов в цепочку '${chain_name}' в таблице '$table' (${family})"
-        while $family -t "$table" -S 2>/dev/null | grep -P "^-A .+ -j ${chain_name}\b" >/dev/null; do
-          local rule=$($family -t "$table" -S 2>/dev/null | grep -P "^-A .+ -j ${chain_name}\b" | head -n 1)
-          eval $family -t "$table" ${rule/-A/-D}
-        done
-
-        echo "[+] Удаление цепочки '${chain_name}' в таблице '$table' (${family})"
-        $family -t "$table" -X "${chain_name}"
-      else
-        echo "[!] Цепочка '${chain_name}' не найдена или не является пользовательской в таблице '$table' (${family})"
-      fi
-    done
-  done
+firewall_iptables_nat(){
+  init_ip_rules 4
+  init_tables_nat "iptables"
+  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+  chain_name_output="${chain_name}"_out
+  add_ipv4tables_exclusions "${chain_name}" "nat"
+  add_ipv4tables_exclusions "${chain_name_output}" "nat"
 }
 
-del_ip_rules() {
-
-  ip_version="${1}"
-
-  table_mark_hex=$(echo "$js_SETTING" | jq -r '.network.table_mark_hex')
-  table_id=$(echo "$js_SETTING" | jq -r '.network.table_id')
-
-  echo "table_mark=${table_mark_hex}"
-  echo "table_id=${table_id}"
-
-  if busybox ip -"${ip_version}" rule show | grep -q "fwmark ${table_mark_hex} lookup ${table_id}" >/dev/null 2>&1; then
-    busybox ip -"${ip_version}" rule del fwmark ${table_mark_hex} lookup ${table_id} >/dev/null 2>&1
-    busybox ip -"${ip_version}" route flush table ${table_id} >/dev/null 2>&1
-    # shellcheck disable=SC3037
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_green}[SUCCESS]${color_reset} Таблица маршрута для Xwave успешна удалена" >&2
-  fi
+firewall_iptables_mangle(){
+  init_ip_rules 4
+  init_tables_mangle "iptables"
+  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+  chain_name_output="${chain_name}"_out
+  add_ipv4tables_exclusions "${chain_name}" "mangle"
+  add_ipv4tables_exclusions "${chain_name_output}" "mangle"
 }
 
-IPv6=$(echo "$js_SETTING" | jq -r '.network.IPv6 // "false"')
+firewall_ip6tables_nat(){
+  init_ip_rules 6
+  init_tables_nat "ip6tables"
+  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+  chain_name_output="${chain_name}"_out
+  add_ipv6tables_exclusions "${chain_name}" "nat"
+  add_ipv6tables_exclusions "${chain_name_output}" "nat"
+}
+
+firewall_ip6tables_mangle(){
+  init_ip_rules 6
+  init_tables_mangle "ip6tables"
+  chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+  chain_name_output="${chain_name}"_out
+  add_ipv6tables_exclusions "${chain_name}" "mangle"
+  add_ipv6tables_exclusions "${chain_name_output}" "mangle"
+}
+
+firewall_iptables(){
+  firewall_iptables_nat
+  firewall_iptables_mangle
+}
+
+firewall_ip6tables(){
+  firewall_ip6tables_nat
+  firewall_ip6tables_mangle
+}
 
 # Менеджер команд
-case "${1}" in
-start)
-    policy_mark=$(get_policy_mark) || {
-    # shellcheck disable=SC3037
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику Xwave на вашем роутере " >&2
-    exit 1
-    }
-    init_ip_rules 4
-    # shellcheck disable=SC3014
-    [ "$IPv6" == "true" ] && init_ip_rules 6
-    init_iptables
-    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
-    chain_name_output="${chain_name}"_out
-    add_ipv4tables_exclusions "${chain_name}"
-    add_ipv4tables_exclusions "${chain_name_output}"
-    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name') # Значение chain_name замещается внутри add_ipv4tables_exclusions
-    # shellcheck disable=SC3014
-    [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name}"
-    # shellcheck disable=SC3014
-    [ "$IPv6" == "true" ] && add_ipv6tables_exclusions "${chain_name_output}"
-    export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
-    export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
-    xray run &
+case $ACTION in
+  start)
+      if [ "$ENABLED" != yes ]; then
+        name_client=$(echo "$js_SETTING" | jq -r '.client.name')
+        echo -e " ${name_client} ${color_green}Отключён в файле \"$(basename "$0")\"${color_reset}"
+		    return 1
+	    fi
+      if [ "$CALLER" = "cron" -a "$ENABLED" != yes ]; then
+		    return 8
+	    fi
+      if is_running; then
+		    echo -e "$PROCS ${color_green} is already running ${color_reset}" >&2
+		    return 1
+	    fi
+      kernel_modules_load
+      wait_for_iptables_tables 20 || exit 1
+      check_iptables_tproxy || exit 1
+      policy_mark=$(get_policy_mark) || {
+      policy=$(echo "$js_SETTING" | jq -r '.network.connection_policy')
+      # shellcheck disable=SC3037
+      echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику ${policy} на вашем роутере " >&2
+      exit 1
+      }
+      firewall_iptables
+      [ "$IPv6" = "true" ] && firewall_ip6tables
+      name_client=$(echo "$js_SETTING" | jq -r '.client.name')
+      echo -e " ${name_client} ${color_green}запускается...${color_reset}"
+      export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
+      export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
+      {
+          echo -e "\n=== $(date) === xray client info ==="
+          xray run &
+      } >> "${LOG_FILE}" 2>&1 &
+      # Небольшая задержка для проверки, что процесс запустился
+      sleep 4
+      if is_running; then
+          echo -e " ${name_client} ${color_green}успешно запущен${color_reset}"
+          logger -t "$(basename "$0")" "${name_client} успешно запущен"
+      else
+          echo -e " ${name_client} ${color_red}не удалось запустить${color_reset}"
+          logger -t "$(basename "$0")" "${name_client} не удалось запустить"
+      fi
+      ;;
+  stop)
+      del_ip_rules 4
+      del_ip_rules 6
+      chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+      chain_name_output="${chain_name}"_out
+      del_iptables "${chain_name}"
+      del_iptables "${chain_name_output}"
+      busybox killall -q -9 "$(echo "$js_SETTING" | jq -r '.client.name')"
+      "$0" status
+      ;;
+  status)
+      name_client=$(echo "$js_SETTING" | jq -r '.client.name')
+      if is_running; then
+        echo -e " ${name_client} ${color_green}запущен${color_reset}"
+      else
+        echo -e " ${name_client} ${color_red}отключён${color_reset}"
+      fi
+      ;;
+  backup)
+      backup_config_xray
     ;;
-stop)
-    del_ip_rules 4
-    del_ip_rules 6
-    chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
-    chain_name_output="${chain_name}"_out
-    del_iptables "${chain_name}"
-    del_iptables "${chain_name_output}"
-    busybox killall -q -9 "$(echo "$js_SETTING" | jq -r '.client.name')"
-    ;;
-status)
-	if proxy_status; then
-		echo -e "  Прокси-клиент ${color_green}запущен${color_reset}"
-	else
-		echo -e "  Прокси-клиент ${color_red}не запущен${color_reset}"
-	fi
-    ;;
-restart)
-    proxy_stop
-    proxy_start ${2}
-    ;;
-*)
-    echo -e "  Команды: ${color_green}start${color_reset} | ${color_red}stop${color_reset} | ${color_yellow}restart${color_reset} | status"
-    ;;
+  restart)
+      "$0" stop
+      "$0" start
+      ;;
+  firewall_iptables_nat)
+      if is_running; then
+        firewall_iptables_nat
+	    fi
+      ;;
+  firewall_iptables_mangle)
+      if is_running; then
+        firewall_iptables_mangle
+      fi
+      ;;
+  firewall_ip6tables_nat)
+      if is_running; then
+        firewall_ip6tables_nat
+      fi
+      ;;
+  firewall_ip6tables_mangle)
+      if is_running; then
+        firewall_ip6tables_mangle
+      fi
+      ;;
+  *)
+      echo -e "  Команды: ${color_green}start${color_reset} | ${color_red}stop${color_reset} | ${color_yellow}restart${color_reset} | ${color_blue}backup${color_reset} | status"
+      ;;
 esac
 
 exit 0
