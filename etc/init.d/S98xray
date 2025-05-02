@@ -11,15 +11,15 @@ DEBUG=true
 
 
 # Путь к JSON-файлу с настройками
-if [ ! -f /opt/etc/swave/settings.json ]; then
-    echo "Файл настроек /opt/etc/swave/settings.json не найден."
-    echo "Пожалуйста, ознакомьтесь с примером настроек: /opt/etc/swave/example.json"
+if [ ! -f /opt/etc/xwave/settings.json ]; then
+    echo "Файл настроек /opt/etc/xwave/settings.json не найден."
+    echo "Пожалуйста, ознакомьтесь с примером настроек: /opt/etc/xwave/example.json"
     echo "Отредактируйте его в соответствии с вашими требованиями,"
     echo "затем переместите в нужное место командой:"
-    echo "  mv /opt/etc/swave/example.json /opt/etc/swave/settings.json"
+    echo "  mv /opt/etc/xwave/example.json /opt/etc/xwave/settings.json"
     exit 1
 else
-    SETTING="/opt/etc/swave/settings.json"
+    SETTING="/opt/etc/xwave/settings.json"
 fi
 
 get_clean_json() {
@@ -507,7 +507,7 @@ init_tables_mangle(){
       "${family}" -w -t mangle -N ${chain_name_output}
       debug "#OUTPUT mangle ($family)"
       # ! --uid-owner 0 — правило применяется ко всем пользователям, кроме root (UID 0).
-      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку swave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
+      # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку xwave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
       #"${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
       "${family}" -w -t mangle -A OUTPUT -p udp -m multiport --dports  ${port_list} -m conntrack ! --ctstate INVALID -j ${chain_name_output}
       "${family}" -w -t mangle -A ${chain_name_output} -p udp -j CONNMARK --set-mark "${table_mark_hex}"
@@ -746,7 +746,7 @@ case $ACTION in
 	    fi
       kernel_modules_load
       wait_for_iptables_tables 20 || exit 1
-      check_iptables_tproxy || exit 1
+    #  check_iptables_tproxy || exit 1
       policy_mark=$(get_policy_mark) || {
       policy=$(echo "$js_SETTING" | jq -r '.network.connection_policy')
       # shellcheck disable=SC3037
