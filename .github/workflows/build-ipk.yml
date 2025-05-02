@@ -185,6 +185,6 @@ jobs:
             else
               --repo "$GITHUB_REPOSITORY" \
               --title "Release $TAG" \
-              --notes-file changelog.txt \
+              --notes-file changelog.txt 
             fi
 
