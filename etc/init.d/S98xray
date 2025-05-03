@@ -730,14 +730,64 @@ firewall_ip6tables(){
 }
 
 database_updates(){
-  json='{
-  "geosite_zkeen.dat": "https://github.com/jameszeroX/zkeen-domains/releases/latest/download/zkeen.dat",
-  "geosite_antifilter.dat": "https://github.com/Skrill0/AntiFilter-Domains/releases/latest/download/geosite.dat",
-  "geosite_v2fly.dat": "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
-}'
 
-# Вывод ключей и значений с помощью jq
-  echo "$json" | jq -r 'to_entries[] | "\(.key) => \(.value)"'
+  # Проверка, разрешена ли загрузка
+  download=$(echo "$js_SETTING" | jq -r '.database.download // "false"')
+  path_data=$(echo "$js_SETTING" | jq -r '.path_data // "/opt/etc/xray/dat"')
+  # Удаление завершающего слэша (если есть), затем добавление одного
+  path_data="${path_data%/}/"
+
+  if [ "$download" = "true" ]; then
+    echo "Загрузка разрешена. Начинаю скачивание файлов..."
+
+  # Перебор и загрузка файлов
+    echo "$js_SETTING" | jq -r '.database.data | to_entries[] | "\(.key) \(.value)"' | while read -r filename url; do
+      echo "Скачивание $filename из $url..."
+      # curl -L -o "$path_data$filename" "$url" >> "${LOG_FILE}" 2>&1
+      download_with_retry "${url}" "${filename}"
+    done
+  else
+    echo "Загрузка отключена (download = false)"
+  fi
+}
+
+download_with_retry() {
+  url="$1"
+  filename="$2"
+  max_retries=3
+  attempt=1
+
+  while [ $attempt -le $max_retries ]; do
+    echo "📥 Попытка $attempt: скачивание $filename"
+
+    if curl -sSL --fail -o "$filename" "$url"; then
+      echo "✅ Успешно скачан: $filename"
+      return 0
+    else
+      echo "⚠️ Ошибка при скачивании $filename (попытка $attempt)"
+    fi
+
+    attempt=$((attempt + 1))
+    sleep 1  # короткая пауза между попытками
+  done
+
+  echo "❌ Не удалось скачать $filename после $max_retries попыток"
+  return 1
+}
+
+add_cron_from_json() {
+  # Разбор JSON
+  MINUTE=$(echo "$js_SETTING" | jq -r '.database.time_update.minute // "5"' )
+  HOUR=$(echo "$js_SETTING" | jq -r '.database.time_update.hour')
+  DOM=$(echo "$js_SETTING" | jq -r '.database.time_update.day_of_month')
+  MONTH=$(echo "$js_SETTING" | jq -r '.database.time_update.month')
+  DOW=$(echo "$js_SETTING" | jq -r '.database.time_update.day_of_week')
+  COMMAND=$(echo "$js_SETTING" | jq -r '.database.time_update.command')
+  DESCRIPTION=$(echo "$js_SETTING" | jq -r '.database.time_update.description')
+
+  CRON_LINE="$MINUTE $HOUR $DOM $MONTH $DOW $COMMAND"
+
+  echo "$CRON_LINE"
 }
 
 # Менеджер команд
@@ -768,6 +818,7 @@ case $ACTION in
       [ "$IPv6" = "true" ] && firewall_ip6tables
       name_client=$(echo "$js_SETTING" | jq -r '.client.name')
       echo -e " ${name_client} ${color_green}запускается...${color_reset}"
+      export XRAY_RAY_BUFFER_SIZE=4 #
       export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
       export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
       {
@@ -831,6 +882,9 @@ case $ACTION in
       ;;
   refresh)
       database_updates
+      ;;
+  crone)
+      add_cron_from_json
       ;;
   *)
       echo -e "  Команды: ${color_green}start${color_reset} | ${color_red}stop${color_reset} | ${color_yellow}restart${color_reset} | ${color_blue}backup${color_reset} | status"

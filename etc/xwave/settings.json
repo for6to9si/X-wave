@@ -60,12 +60,20 @@
   "database":
   {
     "download": true,
-    "time_update": "03:00",
+    "time_update":
+    {
+      "minute": "15",
+      "hour": "5",
+      "day_of_month": "*",
+      "month": "*",
+      "day_of_week": "*"
+    },
     "data":
     {
       "geosite_zkeen.dat": "https://github.com/jameszeroX/zkeen-domains/releases/latest/download/zkeen.dat",
       "geosite_antifilter.dat": "https://github.com/Skrill0/AntiFilter-Domains/releases/latest/download/geosite.dat",
       "geosite_v2fly.dat": "https://github.com/v2fly/domain-list-community/releases/latest/download/dlc.dat"
-    }
+    },
+    "path_data": "/opt/etc/xray/dat"
   }
 }
