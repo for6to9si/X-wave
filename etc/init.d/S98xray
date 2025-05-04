@@ -139,9 +139,26 @@ check_iptables_tproxy() {
         return 0
     else
         echo "[-] iptables не поддерживает TPROXY и/или SOCKET"
+        logger -t "$(basename "$0")" "[-] iptables не поддерживает TPROXY и/или SOCKET"
         iptables -t mangle -F "${TEST_CHAIN}" 2>/dev/null
         iptables -t mangle -X "${TEST_CHAIN}" 2>/dev/null
         return 1
+    fi
+}
+
+check_iptables_multiport() {
+    TEST_CHAIN=$(echo "$js_SETTING" | jq -r '.network.chain_name // "TPROXY_TEST_CHAIN"')
+    iptables -t mangle -N "${TEST_CHAIN}" 2>/dev/null
+    if iptables -t mangle -A "${TEST_CHAIN}" -p tcp -m multiport --dports 80,443,8080 -j RETURN 2>/dev/null; then
+        debug "[OK] iptables поддерживает multiport"
+        iptables -t mangle -F "${TEST_CHAIN}"
+        iptables -t mangle -X "${TEST_CHAIN}"
+    else
+        echo "[-] iptables не поддерживает multiport"
+        logger -t "$(basename "$0")" "[-] iptables не поддерживает multiport"
+        iptables -t mangle -F "${TEST_CHAIN}" 2>/dev/null
+        iptables -t mangle -X "${TEST_CHAIN}" 2>/dev/null
+        exit 1
     fi
 }
 
@@ -834,8 +851,9 @@ case $ACTION in
 		    return 1
 	    fi
       kernel_modules_load
-      wait_for_iptables_tables 20 || exit 1
       check_iptables_tproxy || exit 1
+      check_iptables_multiport || exit 1
+      wait_for_iptables_tables 20 || exit 1
       policy_mark=$(get_policy_mark) || {
       policy=$(echo "$js_SETTING" | jq -r '.network.connection_policy')
       # shellcheck disable=SC3037

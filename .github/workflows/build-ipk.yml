@@ -73,7 +73,7 @@ jobs:
         
         cp ./etc/ndm/netfilter.d/000-xwave.sh xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
         chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
-        cp ./etc/xwave/settings.json xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave/settings.json
+        cp ./etc/xwave/settings.json xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave/example.json
 
     - name: Include xray license and copyright
       run: |

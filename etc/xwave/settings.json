@@ -7,7 +7,7 @@
   "app":
   {
     "name": "xwave",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "log": "/opt/var/log/xwave/xwave.log"
   },
   "network":
@@ -16,8 +16,8 @@
     "table_mark_hex": "0x3629",
     "connection_policy": "xwave",
     "chain_name": "xwave",
-    "port_redirect": "60018",
-    "port_tproxy": "60019",
+    "port_redirect": "61218",
+    "port_tproxy": "61219",
     "port_forwarding_list":
     [
       80,
