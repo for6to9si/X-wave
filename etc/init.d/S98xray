@@ -835,7 +835,7 @@ case $ACTION in
 	    fi
       kernel_modules_load
       wait_for_iptables_tables 20 || exit 1
-    #  check_iptables_tproxy || exit 1
+      check_iptables_tproxy || exit 1
       policy_mark=$(get_policy_mark) || {
       policy=$(echo "$js_SETTING" | jq -r '.network.connection_policy')
       # shellcheck disable=SC3037
