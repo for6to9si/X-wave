@@ -107,19 +107,35 @@ wait_for_iptables_tables() {
     while :; do
         NAT_READY=false
         MANGLE_READY=false
+        MULTIPORT_READY=false
 
         iptables -t nat -S >/dev/null 2>&1 && NAT_READY=true
         iptables -t mangle -S >/dev/null 2>&1 && MANGLE_READY=true
 
         if $NAT_READY && $MANGLE_READY; then
-            logger -t "$(basename "$0")" "[${client}] iptables таблицы nat и mangle доступны"
+            # Проверка multiport — создаём временную цепочку один раз
+            TMP_CHAIN="MULTIPORT_TEST_CHAIN"
+            iptables -t mangle -N $TMP_CHAIN 2>/dev/null
+
+            if iptables -t mangle -A $TMP_CHAIN -p tcp -m multiport --dports 881,2443 -j RETURN 2>/dev/null; then
+                MULTIPORT_READY=true
+                iptables -t mangle -F $TMP_CHAIN
+                iptables -t mangle -X $TMP_CHAIN
+            else
+                iptables -t mangle -F $TMP_CHAIN 2>/dev/null
+                iptables -t mangle -X $TMP_CHAIN 2>/dev/null
+            fi
+        fi
+
+        if $NAT_READY && $MANGLE_READY && $MULTIPORT_READY; then
+            logger -t "$(basename "$0")" "[${client}] iptables: nat, mangle и multiport доступны"
             return 0
         fi
 
         sleep "$INTERVAL"
         ELAPSED=$((ELAPSED + INTERVAL))
         if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
-            logger -t "$(basename "$0")" "[${client}] iptables таблицы не стали доступны за $TIMEOUT сек"
+            logger -t "$(basename "$0")" "[${client}] iptables не готовы (nat, mangle, multiport) за $TIMEOUT сек"
             return 1
         fi
     done
@@ -149,7 +165,7 @@ check_iptables_tproxy() {
 check_iptables_multiport() {
     TEST_CHAIN=$(echo "$js_SETTING" | jq -r '.network.chain_name // "TPROXY_TEST_CHAIN"')
     iptables -t mangle -N "${TEST_CHAIN}" 2>/dev/null
-    if iptables -t mangle -A "${TEST_CHAIN}" -p tcp -m multiport --dports 80,443,8080 -j RETURN 2>/dev/null; then
+    if iptables -t mangle -A "${TEST_CHAIN}" -p tcp -m multiport --dports 180,2443,2080 -j RETURN 2>/dev/null; then
         debug "[OK] iptables поддерживает multiport"
         iptables -t mangle -F "${TEST_CHAIN}"
         iptables -t mangle -X "${TEST_CHAIN}"
