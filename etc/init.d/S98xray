@@ -738,37 +738,42 @@ database_updates(){
   path_data="${path_data%/}/"
 
   if [ "$download" = "true" ]; then
-    echo "Загрузка разрешена. Начинаю скачивание файлов..."
+    logger -t "$(basename "$0")" "Загрузка разрешена. Начинаю скачивание файлов..."
 
   # Перебор и загрузка файлов
     echo "$js_SETTING" | jq -r '.database.data | to_entries[] | "\(.key) \(.value)"' | while read -r filename url; do
-      echo "Скачивание $filename из $url..."
+      logger -t "$(basename "$0")" "Скачивание $filename из $url..."
       # curl -L -o "$path_data$filename" "$url" >> "${LOG_FILE}" 2>&1
       download_with_retry "${url}" "${filename}"
     done
   else
-    echo "Загрузка отключена (download = false)"
+    logger -t "$(basename "$0")" "Загрузка отключена (download = false)"
   fi
 }
 
 download_with_retry() {
   url="$1"
   filename="$2"
+  temp_file="${filename}.tmp"
   max_retries=3
   attempt=1
 
   while [ $attempt -le $max_retries ]; do
     echo "📥 Попытка $attempt: скачивание $filename"
 
-    if curl -sSL --fail -o "$filename" "$url"; then
+    if curl -sSL --fail -o "$temp_file" "$url"; then
+      mv "$temp_file" "$filename"
       echo "✅ Успешно скачан: $filename"
+      logger -t "$(basename "$0")" "✅ Успешно скачан: $filename"
       return 0
     else
       echo "⚠️ Ошибка при скачивании $filename (попытка $attempt)"
+      logger -t "$(basename "$0")" "⚠️ Ошибка при скачивании $filename (попытка $attempt)"
+      rm -f "$temp_file"  # Удаление повреждённого или неполного файла
     fi
 
     attempt=$((attempt + 1))
-    sleep 1  # короткая пауза между попытками
+    sleep 1
   done
 
   echo "❌ Не удалось скачать $filename после $max_retries попыток"
@@ -777,17 +782,40 @@ download_with_retry() {
 
 add_cron_from_json() {
   # Разбор JSON
-  MINUTE=$(echo "$js_SETTING" | jq -r '.database.time_update.minute // "5"' )
-  HOUR=$(echo "$js_SETTING" | jq -r '.database.time_update.hour')
-  DOM=$(echo "$js_SETTING" | jq -r '.database.time_update.day_of_month')
-  MONTH=$(echo "$js_SETTING" | jq -r '.database.time_update.month')
-  DOW=$(echo "$js_SETTING" | jq -r '.database.time_update.day_of_week')
-  COMMAND=$(echo "$js_SETTING" | jq -r '.database.time_update.command')
-  DESCRIPTION=$(echo "$js_SETTING" | jq -r '.database.time_update.description')
+  MINUTE=$(echo "$js_SETTING" | jq -r '.database.time_update.minute // "15"' )
+  HOUR=$(echo "$js_SETTING" | jq -r '.database.time_update.hour // "3"')
+  DOM=$(echo "$js_SETTING" | jq -r '.database.time_update.day_of_month // "*"')
+  MONTH=$(echo "$js_SETTING" | jq -r '.database.time_update.month // "*"')
+  DOW=$(echo "$js_SETTING" | jq -r '.database.time_update.day_of_week // "*"')
+  COMMAND=$(echo "$js_SETTING" | jq -r '.database.time_update.command // "/opt/etc/init.d/S98xray refresh"')
+  DESCRIPTION=$(echo "$js_SETTING" | jq -r '.database.time_update.description // "Cron job from JSON"')
 
   CRON_LINE="$MINUTE $HOUR $DOM $MONTH $DOW $COMMAND"
 
+  # Получаем текущий crontab
+  EXISTING=$(crontab -l 2>/dev/null || true)
+
+  # Удаляем любые строки, содержащие команду (включая комментарии перед ней)
+  FILTERED=$(echo "$EXISTING" | awk -v cmd="$COMMAND" '
+    BEGIN { skip=0 }
+    $0 ~ "^#.*" && skip == 0 { desc=$0; next }
+    index($0, cmd) > 0 { skip=1; next }
+    skip == 1 { skip=0; next }
+    { print }
+  ')
+
+  # Добавляем новое задание
+  echo "$FILTERED" | {
+    cat
+    echo "# $DESCRIPTION"
+    echo "$CRON_LINE"
+  } | crontab -
+
+  echo "Обновлено cron-задание:"
   echo "$CRON_LINE"
+  echo
+  echo "Актуальный crontab:"
+  crontab -l
 }
 
 # Менеджер команд
@@ -818,7 +846,7 @@ case $ACTION in
       [ "$IPv6" = "true" ] && firewall_ip6tables
       name_client=$(echo "$js_SETTING" | jq -r '.client.name')
       echo -e " ${name_client} ${color_green}запускается...${color_reset}"
-      export XRAY_RAY_BUFFER_SIZE=4 #
+      export XRAY_RAY_BUFFER_SIZE=4
       export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
       export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
       {
@@ -882,8 +910,10 @@ case $ACTION in
       ;;
   refresh)
       database_updates
+      "$0" stop
+      "$0" start
       ;;
-  crone)
+  cron)
       add_cron_from_json
       ;;
   *)
