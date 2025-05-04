@@ -364,6 +364,10 @@ kernel_modules_load() {
             fi
         fi
     done
+
+    (modprobe xt_TPROXY --first-time >/dev/null 2>&1 && echo "xt_TPROXY loaded") || true
+	  (modprobe xt_socket --first-time >/dev/null 2>&1 && echo "xt_socket loaded") || true
+    (modprobe xt_multiport --first-time >/dev/null 2>&1 && echo "xt_multiport loaded") || true
 }
 
 init_dns_tables(){
