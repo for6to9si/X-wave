@@ -526,7 +526,7 @@ init_tables_mangle(){
       "${family}" -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}" >> "${LOG_FILE}" 2>&1
       "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}" >> "${LOG_FILE}" 2>&1
       "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports  ${port_list} -j ${chain_name} >> "${LOG_FILE}" 2>&1
-    #   "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} >> "${LOG_FILE}" 2>&1
+      # "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} >> "${LOG_FILE}" 2>&1
       echo "$port_ranges" | while read -r range; do
         [ -n "$range" ] || continue
         "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp --dport "$range" -j ${chain_name}
@@ -877,8 +877,6 @@ case $ACTION in
       echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику ${policy} на вашем роутере " >&2
       exit 1
       }
-      firewall_iptables
-      [ "$IPv6" = "true" ] && firewall_ip6tables
       name_client=$(echo "$js_SETTING" | jq -r '.client.name')
       echo -e " ${name_client} ${color_green}запускается...${color_reset}"
       export XRAY_RAY_BUFFER_SIZE=4
@@ -897,6 +895,8 @@ case $ACTION in
           echo -e " ${name_client} ${color_red}не удалось запустить${color_reset}"
           logger -t "$(basename "$0")" "${name_client} не удалось запустить"
       fi
+      firewall_iptables
+      [ "$IPv6" = "true" ] && firewall_ip6tables
       ;;
   stop)
       del_ip_rules 4
@@ -950,6 +950,18 @@ case $ACTION in
       ;;
   cron)
       add_cron_from_json
+      ;;
+  firewall_up)
+      firewall_iptables
+      [ "$IPv6" = "true" ] && firewall_ip6tables
+      ;;
+  firewall_down)
+      del_ip_rules 4
+      del_ip_rules 6
+      chain_name=$(echo "$js_SETTING" | jq -r '.network.chain_name')
+      chain_name_output="${chain_name}"_out
+      del_iptables "${chain_name}"
+      del_iptables "${chain_name_output}"
       ;;
   *)
       echo -e "  Команды: ${color_green}start${color_reset} | ${color_red}stop${color_reset} | ${color_yellow}restart${color_reset} | ${color_blue}backup${color_reset} | status"
