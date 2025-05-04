@@ -7,7 +7,7 @@
   "app":
   {
     "name": "xwave",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "log": "/opt/var/log/xwave/xwave.log"
   },
   "network":

@@ -299,7 +299,7 @@ fi
 kernel_modules_load() {
     KERNEL=$(uname -r)
 
-    for mod in xt_TPROXY xt_socket; do
+    for mod in xt_TPROXY xt_socket xt_multiport; do
         debug "[INFO] Checking for module: $mod"
 
         if lsmod | grep -q "^$mod"; then
@@ -744,7 +744,7 @@ database_updates(){
     echo "$js_SETTING" | jq -r '.database.data | to_entries[] | "\(.key) \(.value)"' | while read -r filename url; do
       logger -t "$(basename "$0")" "Скачивание $filename из $url..."
       # curl -L -o "$path_data$filename" "$url" >> "${LOG_FILE}" 2>&1
-      download_with_retry "${url}" "${filename}"
+      download_with_retry "${url}" "$path_data$filename"
     done
   else
     logger -t "$(basename "$0")" "Загрузка отключена (download = false)"
