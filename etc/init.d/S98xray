@@ -526,7 +526,7 @@ init_tables_mangle(){
       "${family}" -w -t mangle -I ${chain_name} -p udp -m socket --transparent -j MARK --set-mark "${table_mark_hex}" >> "${LOG_FILE}" 2>&1
       "${family}" -w -t mangle -A ${chain_name} -p udp -j TPROXY --on-ip "$loopback_ip" --on-port "${port_tproxy}" --tproxy-mark "${table_mark_hex}" >> "${LOG_FILE}" 2>&1
       "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports  ${port_list} -j ${chain_name} >> "${LOG_FILE}" 2>&1
-      # "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} >> "${LOG_FILE}" 2>&1
+      "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} >> "${LOG_FILE}" 2>&1
       echo "$port_ranges" | while read -r range; do
         [ -n "$range" ] || continue
         "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp --dport "$range" -j ${chain_name}
@@ -542,8 +542,8 @@ init_tables_mangle(){
       debug "#OUTPUT mangle ($family)"
       # ! --uid-owner 0 — правило применяется ко всем пользователям, кроме root (UID 0).
       # Для всех исходящих UDP-пакетов, отправленных НЕ от root-пользователя, применяется переход в цепочку xwave_out (идёт маркировка, перенаправление, маршрутизация и т.д.).
-      #"${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
-      "${family}" -w -t mangle -A OUTPUT -p udp -m multiport --dports  ${port_list} -m conntrack ! --ctstate INVALID -j ${chain_name_output}
+      "${family}" -w -t mangle -A OUTPUT -m owner ! --uid-owner 0 -m conntrack ! --ctstate INVALID -p udp -j ${chain_name_output}
+      #"${family}" -w -t mangle -A OUTPUT -p udp -m multiport --dports  ${port_list} -m conntrack ! --ctstate INVALID -j ${chain_name_output}
       "${family}" -w -t mangle -A ${chain_name_output} -p udp -j CONNMARK --set-mark "${table_mark_hex}"
       echo "$port_ranges" | while read -r range; do
         [ -n "$range" ] || continue
@@ -852,6 +852,15 @@ add_cron_from_json() {
   crontab -l
 }
 
+create_user() {
+  name_client=$(echo "$js_SETTING" | jq -r '.client.name')
+  if ! id "${name_client}" >/dev/null 2>&1; then
+    adduser -D -H -u 13629 -g 13629 ${name_client}
+    sed -i "/^${name_client}:/c\\${name_client}:x:0:13629:::" /opt/etc/passwd
+  fi
+}
+
+
 # Менеджер команд
 case $ACTION in
   start)
@@ -877,15 +886,19 @@ case $ACTION in
       echo -e "$(date '+%Y-%m-%d %H:%M:%S') ${color_yellow}[INFO]${color_reset} Добавьте политику ${policy} на вашем роутере " >&2
       exit 1
       }
+      create_user
       name_client=$(echo "$js_SETTING" | jq -r '.client.name')
       echo -e " ${name_client} ${color_green}запускается...${color_reset}"
       export XRAY_RAY_BUFFER_SIZE=4
       export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
       export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
-      {
-          echo -e "\n=== $(date) === xray client info ==="
-          xray run &
-      } >> "${LOG_FILE}" 2>&1 &
+      # {
+      #     echo -e "\n=== $(date) === xray client info ==="
+      #     ulimit -SHn 1000000 && exec su -c "xray run" "${name_client}" &
+      # } >> "${LOG_FILE}" 2>&1 &
+
+      ulimit -SHn 1000000 && exec su -c "xray run" "${name_client}" &
+
       # Небольшая задержка для проверки, что процесс запустился
       sleep 4
       if is_running; then
@@ -894,6 +907,7 @@ case $ACTION in
       else
           echo -e " ${name_client} ${color_red}не удалось запустить${color_reset}"
           logger -t "$(basename "$0")" "${name_client} не удалось запустить"
+          return 1
       fi
       firewall_iptables
       [ "$IPv6" = "true" ] && firewall_ip6tables
