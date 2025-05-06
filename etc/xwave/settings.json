@@ -7,7 +7,7 @@
   "app":
   {
     "name": "xwave",
-    "version": "0.0.6",
+    "version": "0.0.5",
     "log": "/opt/var/log/xwave/xwave.log"
   },
   "network":
@@ -24,23 +24,16 @@
       443,
       8080
     ],
-    "port_forwarding_range":
-    [
-      "1024:1055",
-      "1000:1099"
-    ],
     "DNS_forwarding": true,
-    "IPv6": false,
-    "IPv6_exclusions":
-    [
-      "2a02:6b8::2:242/128",
-      "2a02:6b8:a::a/128"
-    ],
+    "IPv6": true,
     "IPv4_exclusions":
     [
-      "95.173.136.0/24",
-      "95.173.137.0/24",
-      "95.173.138.0/24"
+      "143.42.19.226/32",
+      "77.238.240.226/32"
+    ],
+    "IPv6_exclusions":[
+      "2a01:7e00::/29", //IP адреса ваших корпоративных серверов
+      "2001:19f0::/32"
     ],
     "dns":
     {
