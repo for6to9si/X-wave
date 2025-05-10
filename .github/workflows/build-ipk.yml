@@ -62,7 +62,7 @@ jobs:
 
         cat > xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
         Package: xray
-        Depends: libc,libssp,librt,libpthread,libpthread,jq,iptables,cron,curl
+        Depends: libc,libssp,librt,libpthread,libpthread,jq,iptables,cron,curl,coreutils-numfm,column
         Version: ${{ steps.version.outputs.version }}
         Architecture: mipsel-3.4
         Section: net
