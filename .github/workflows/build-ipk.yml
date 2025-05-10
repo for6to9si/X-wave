@@ -87,6 +87,7 @@ jobs:
         unzip Xray-linux-${{ matrix.arch }}.zip LICENSE -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray
         ls -al ./
         ls -R ./
+        ls -al xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/traffic.sh
  
     - name: Package IPK
       run: |
