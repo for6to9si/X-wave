@@ -3,6 +3,14 @@
 _APISERVER=127.0.0.1:8080
 _XRAY=/opt/sbin/xray
 CSV_FILE="/opt/var/log/xwave/xray_stats.csv"
+export PATH=/opt/bin:/opt/sbin:/usr/bin:/bin:/sbin:/usr/sbin
+
+# CMD="/opt/sbin/traffic.sh >> /opt/tmp/traffic.log 2>&1"
+# crontab -l 2>/dev/null | grep -F "$CMD" >/dev/null || \
+#   (crontab -l 2>/dev/null; echo "*/5 * * * * $CMD") | crontab -
+
+#(crontab -l 2>/dev/null; echo "*/5 * * * * /opt/sbin/traffic.sh >> /opt/tmp/traffic.log 2>&1") | crontab -
+
 
 #crontab -l
 
