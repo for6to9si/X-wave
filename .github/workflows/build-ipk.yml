@@ -55,7 +55,7 @@ jobs:
         mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
 
         unzip Xray-linux-${{ matrix.arch }}.zip xray -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
-        chown root:root xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/xray
+        # chown root:root xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/xray
 
 
         cp ./etc/init.d/S98xray xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
