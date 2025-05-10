@@ -74,7 +74,7 @@ jobs:
         chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
         cp ./etc/xwave/settings.json xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave/example.json
         cp ./sbin/traffic.sh xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/
-        chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/traffic.sh'
+        chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/traffic.sh
 
     - name: Include xray license and copyright
       run: |
