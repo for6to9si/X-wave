@@ -92,13 +92,13 @@ jobs:
     - name: Package IPK
       run: |
         cd xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}
-        tar -czf ../data.tar.gz ./opt/sbin ./opt/etc ./opt/var/log/xwave
+        fakeroot tar -czf ../data.tar.gz ./opt/sbin ./opt/etc ./opt/var/log/xwave
         cd ./CONTROL
-        tar -czf ../../control.tar.gz *
+        fakeroot tar -czf ../../control.tar.gz *
         cd ..
         echo "2.0" > ../debian-binary
         cd ..
-        tar -czf xray_${{ steps.version.outputs.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
+        fakeroot tar -czf xray_${{ steps.version.outputs.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
         
     - name: Store build timestamp
       run: echo "BUILD_TIME=$(date +'%T')" >> $GITHUB_ENV
