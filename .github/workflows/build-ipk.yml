@@ -55,10 +55,12 @@ jobs:
         mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
 
         unzip Xray-linux-${{ matrix.arch }}.zip xray -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
+        chown root:root xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/xray
 
 
         cp ./etc/init.d/S98xray xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
         chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
+        chown root:root xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
 
         cat > xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
         Package: xray
@@ -73,7 +75,11 @@ jobs:
         
         cp ./etc/ndm/netfilter.d/000-xwave.sh xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
         chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
+        chown root:root xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
         cp ./etc/xwave/settings.json xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave/example.json
+        chown root:root xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave/example.json
+        cp ./sbin/traffic.sh xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/
+        chown root:root xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/traffic.sh
 
     - name: Include xray license and copyright
       run: |

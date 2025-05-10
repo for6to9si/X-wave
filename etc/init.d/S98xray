@@ -883,12 +883,12 @@ case $ACTION in
       export XRAY_RAY_BUFFER_SIZE=4
       export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
       export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
-      # {
-      #     echo -e "\n=== $(date) === xray client info ==="
-      #     xray run &
-      # } >> "${LOG_FILE}" 2>&1 &
+      {
+          echo -e "\n=== $(date) === xray client info ==="
+          xray run &
+      } >> "${LOG_FILE}" 2>&1 &
 
-      xray run &
+      # xray run &
 
       # Небольшая задержка для проверки, что процесс запустился
       sleep 4
