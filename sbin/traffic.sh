@@ -73,12 +73,16 @@ echo "-----------------------------"
 
 # 1) Заголовок, если нужно
 if [ ! -f "$CSV_FILE" ]; then
-  printf "timestamp" > "$CSV_FILE"
-  printf ",top xray" >> "$CSV_FILE"
-  for fld in $FIELDS; do
-    printf ",%s" "$fld" >> "$CSV_FILE"
-  done
-  printf "\n" >> "$CSV_FILE"
+  {
+    printf "timestamp"
+    printf ",top xray"
+    printf ",netfilter conntrack"
+    printf ",top ndm"
+    for fld in $FIELDS; do
+      printf ",%s" "$fld"
+    done
+    printf "\n"
+  } > "$CSV_FILE"
 fi
 
 # 2) Собираем одну строку: timestamp + значения в байтах
@@ -86,6 +90,11 @@ TS=$(date -Iseconds)
 printf "%s" "$TS" >> "$CSV_FILE"
 _TOP=$(top -n 1 | grep "xray run" | grep -v grep | sed -E 's/([0-9]+m)([0-9]+\.[0-9]+)/\1 \2/' | awk '{cpu += $8} END {print cpu}' || echo 'xray not running')
 printf ",%s" "$_TOP" >> "$CSV_FILE"
+_Connection=$([ -f /proc/net/nf_conntrack ] && wc -l < /proc/net/nf_conntrack || echo 0)
+printf ",%s" "$_Connection" >> "$CSV_FILE"
+_NDM=$(top -n 1 | grep "ndm" | grep -v grep | sed -E 's/([0-9]+m)([0-9]+\.[0-9]+)/\1 \2/' | awk '{cpu += $8} END {print cpu}' || echo 'ndm not running')
+printf ",%s" "$_NDM" >> "$CSV_FILE"
+
 for fld in $FIELDS; do
   # ищем exact match "fld\t<number>"
   val=$(printf "%s\n" "$DATA" | grep "^${fld}" | cut -f2)
