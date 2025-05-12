@@ -167,6 +167,7 @@ wait_for_iptables_tables() {
     INTERVAL=1
     ELAPSED=0
     client=$(echo "$js_SETTING" | jq -r '.client.name')
+    policy=$(echo "$js_SETTING" | jq -r '.network.connection_policy')
     logger -t "$(basename "$0")" "[${client}] Ожидание доступности iptables (таблицы nat и mangle)..."
 
     while :; do
@@ -195,7 +196,7 @@ wait_for_iptables_tables() {
         if $NAT_READY && $MANGLE_READY && $MULTIPORT_READY; then
             logger -t "$(basename "$0")" "[${client}] iptables: nat, mangle и multiport доступны"
             if ip rule show | grep -q "fwmark $(get_policy_mark)"; then
-              logger -t "$(basename "$0")" "[${client}] требуемая политика $(get_policy_mark) на роутере присутствует и корректно настроена"
+              logger -t "$(basename "$0")" "[${client}] требуемая политика ${policy} на роутере присутствует и корректно настроена"
               return 0
             fi
         fi
@@ -893,18 +894,22 @@ case $ACTION in
 
       # xray run &
 
-      # Небольшая задержка для проверки, что процесс запустился
-      sleep 4
-      if is_running; then
-          echo -e " ${name_client} ${color_green}успешно запущен${color_reset}"
-          logger -t "$(basename "$0")" "${name_client} успешно запущен"
+      if [ -t 0 ]; then
+        firewall_iptables
+        [ "$IPv6" = "true" ] && firewall_ip6table
+        # Небольшая задержка для проверки, что процесс запустился
+        sleep 4
+        if is_running; then
+            echo -e " ${name_client} ${color_green}успешно запущен${color_reset}"
+            logger -t "$(basename "$0")" "${name_client} успешно запущен"
+        else
+            echo -e " ${name_client} ${color_red}не удалось запустить${color_reset}"
+            logger -t "$(basename "$0")" "${name_client} не удалось запустить"
+            return 1
+        fi
       else
-          echo -e " ${name_client} ${color_red}не удалось запустить${color_reset}"
-          logger -t "$(basename "$0")" "${name_client} не удалось запустить"
-          return 1
+        logger -t "$(basename "$0")" "${name_client} is set up for background launch via init/rc."
       fi
-      firewall_iptables
-      [ "$IPv6" = "true" ] && firewall_ip6tables
       ;;
   stop)
       del_ip_rules 4
