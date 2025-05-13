@@ -2,6 +2,7 @@
 
 ENABLED=yes
 DEBUG=true
+export PATH=/opt/bin:/opt/sbin:/usr/bin:/bin:/sbin:/usr/sbin
 
 # Включение трассировки (если нужно)
 #[ "$DEBUG" = "true" ] && set -x
@@ -896,7 +897,7 @@ case $ACTION in
 
       if [ -t 0 ]; then
         firewall_iptables
-        [ "$IPv6" = "true" ] && firewall_ip6table
+        [ "$IPv6" = "true" ] && firewall_ip6tables
         # Небольшая задержка для проверки, что процесс запустился
         sleep 4
         if is_running; then
@@ -957,7 +958,9 @@ case $ACTION in
       fi
       ;;
   refresh)
+      logger -t "$(basename "$0")" "Refresh has been started."
       database_updates
+      logger -t "$(basename "$0")" "The database updates have been applied."
       "$0" stop
       "$0" start
       ;;
