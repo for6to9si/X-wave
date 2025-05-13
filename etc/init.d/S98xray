@@ -857,6 +857,36 @@ add_cron_from_json() {
   crontab -l
 }
 
+remove_cron_job() {
+  # Получаем команду из JSON или используем значение по умолчанию
+  COMMAND=$(echo "$js_SETTING" | jq -r '.database.time_update.command // "/opt/etc/init.d/S98xray refresh"')
+
+  # Получаем текущий crontab
+  EXISTING=$(crontab -l 2>/dev/null || true)
+
+  # Удаляем задание с указанной командой и комментарий перед ним
+  FILTERED=$(echo "$EXISTING" | awk -v cmd="$COMMAND" '
+    BEGIN { skip=0; prev=""; }
+    $0 ~ "^#.*" { prev=$0; next; }
+    index($0, cmd) > 0 { skip=1; next; }
+    { if (skip == 0) {
+        if (prev != "") print prev;
+        print;
+      } else {
+        skip=0;
+      }
+      prev="";
+    }
+  ')
+
+  # Записываем обновленный crontab
+  echo "$FILTERED" | crontab -
+
+  echo "Удалено cron-задание, содержащее команду: $COMMAND"
+  echo
+  echo "Актуальный crontab:"
+  crontab -l
+}
 
 # Менеджер команд
 case $ACTION in
@@ -958,18 +988,32 @@ case $ACTION in
       fi
       ;;
   refresh)
-      logger -t "$(basename "$0")" "Refresh has been started."
+      logger -t "$(basename "$0")" "Refresh has been started"
       database_updates
-      logger -t "$(basename "$0")" "The database updates have been applied."
+      logger -t "$(basename "$0")" "The database updates have been applied"
       "$0" stop
       "$0" start
+      if ! [ -t 0 ]; then
+        "$0" firewall_up
+      fi
       ;;
-  cron)
-      add_cron_from_json
-      ;;
+cron)
+    case "$2" in
+        add)
+            add_cron_from_json
+            ;;
+        del)
+            remove_cron_job
+            ;;
+        *)
+            echo -e "  Команды: ${color_green}cron add ${color_reset} | ${color_yellow}cron del${color_reset} "
+            ;;
+    esac
+    ;;
   firewall_up)
       firewall_iptables
       [ "$IPv6" = "true" ] && firewall_ip6tables
+      logger -t "$(basename "$0")" "Firewall was launched"
       ;;
   firewall_down)
       del_ip_rules 4
@@ -980,7 +1024,7 @@ case $ACTION in
       del_iptables "${chain_name_output}"
       ;;
   *)
-      echo -e "  Команды: ${color_green}start${color_reset} | ${color_red}stop${color_reset} | ${color_yellow}restart${color_reset} | ${color_blue}backup${color_reset} | status"
+      echo -e "  Команды: ${color_green}start${color_reset} | ${color_red}stop${color_reset} | ${color_yellow}restart${color_reset} | ${color_blue}backup${color_reset} | ${color_green}cron${color_reset} | status"
       ;;
 esac
 
