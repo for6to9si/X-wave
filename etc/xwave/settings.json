@@ -7,7 +7,6 @@
   "app":
   {
     "name": "xwave",
-    "version": "0.0.6",
     "log": "/opt/var/log/xwave/xwave.log"
   },
   "network":
@@ -62,8 +61,8 @@
     "download": true,
     "time_update":
     {
-      "minute": "2",
-      "hour": "00",
+      "minute": "05",
+      "hour": "02",
       "day_of_month": "*",
       "month": "*",
       "day_of_week": "*"
