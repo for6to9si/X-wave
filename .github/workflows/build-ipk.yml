@@ -117,7 +117,7 @@ jobs:
       - name: Read version from S98xray file
         id: generate_tag
         run: |
-          VERSION_LINE=$(grep -E '^# @version:' S98xray || true)
+          VERSION_LINE=$(grep -E '^# @version:' ./etc/init.d/S98xray || true)
           if [ -z "$VERSION_LINE" ]; then
             echo "Version not found!" >&2
             exit 1
