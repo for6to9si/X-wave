@@ -397,79 +397,75 @@ kernel_modules_load() {
 
 }
 
-init_dns_tables(){
+init_exclusions_ip(){
 
     # Проверка наличия цепочек и включенного dns_filter
     if [ "${1}" = "iptables" ] \
     && [ "${2}" = "nat" ] \
-    && iptables -t nat -nL "${chain_name}" >/dev/null 2>&1 \
-    && echo "$js_SETTING" | jq -e '.network.dns.dns_filter == true' >/dev/null
+    && iptables -t nat -nL "${3}" >/dev/null 2>&1 \
+    && echo "$js_SETTING" | jq -e '.network.dns_filter == true' >/dev/null
     then
         # IPv4
-        for ip in $(echo "$js_SETTING" | jq -r '.network.dns.IPv4[]'); do
-            if ! iptables -t nat -C "${chain_name}" -d "$ip" -p tcp -m tcp ! --dport 53 -j RETURN 2>/dev/null; then
-                iptables -w -t nat    -A "${chain_name}" -d "$ip" -p tcp -m tcp ! --dport 53 -j RETURN
+        for ip in $(echo "$js_SETTING" | jq -r '.network.IPv4_exclusions[]'); do
+            if ! iptables -t nat -C "${3}" -d "$ip" -j RETURN 2>/dev/null; then
+              iptables -w -t nat -A "${3}" -d "$ip"  -j RETURN
+              debug "[OK] IP ${ip} из IPv4_exclusions был внесен в (таблица: ${2}) цепи ${3}"
+            else
+              debug "[FAIL] IP ${ip} из IPv4_exclusions был внесен в (таблица: ${2}) цепи ${3}"
             fi
-            if ! iptables -t nat -C "${chain_name}" -d "$ip" -p udp -m udp --dport 53 -j RETURN 2>/dev/null; then
-                iptables -w -t nat    -A "${chain_name}" -d "$ip" -p udp -m udp --dport 53 -j RETURN
-            fi
-            debug "DNS таблица цепи ${chain_name} для ${ip} создана"
         done
     fi
 
     if [ "${1}" = "iptables" ] \
     && [ "${2}" = "mangle" ] \
-    && iptables -t mangle -nL "${chain_name}" >/dev/null 2>&1 \
-    && echo "$js_SETTING" | jq -e '.network.dns.dns_filter == true' >/dev/null
+    && iptables -t mangle -nL "${3}" >/dev/null 2>&1 \
+    && echo "$js_SETTING" | jq -e '.network.dns_filter == true' >/dev/null
     then
         # IPv4
-        for ip in $(echo "$js_SETTING" | jq -r '.network.dns.IPv4[]'); do
-            if ! iptables -t mangle -C "${chain_name}" -d "$ip" -p tcp -m tcp --dport 53 -j RETURN 2>/dev/null; then
-                iptables -w -t mangle -A "${chain_name}" -d "$ip" -p tcp -m tcp --dport 53 -j RETURN
+        for ip in $(echo "$js_SETTING" | jq -r '.network.IPv4_exclusions[]'); do
+            if ! iptables -t mangle -C "${3}" -d "$ip" -j RETURN 2>/dev/null; then
+              iptables -w -t mangle -A "${3}" -d "$ip" -j RETURN
+              debug "[OK] IP ${ip} из IPv4_exclusions был внесен в (таблица: ${2}) цепи ${3}"
+            else
+              debug "[FAIL] IP ${ip} из IPv4_exclusions был внесен в (таблица: ${2}) цепи ${3}"
             fi
-            if ! iptables -t mangle -C "${chain_name}" -d "$ip" -p udp -m udp ! --dport 53 -j RETURN 2>/dev/null; then
-                iptables -w -t mangle -A "${chain_name}" -d "$ip" -p udp -m udp ! --dport 53 -j RETURN
-            fi
-            debug "DNS таблица цепи ${chain_name} для ${ip} создана"
         done
     fi
 
     if [ "${1}" = "ip6tables" ] \
     && [ "${2}" = "nat" ] \
-    && ip6tables -t nat -nL "${chain_name}" >/dev/null 2>&1 \
-    && echo "$js_SETTING" | jq -e '.network.dns.dns_filter == true' >/dev/null
+    && ip6tables -t nat -nL "${3}" >/dev/null 2>&1 \
+    && echo "$js_SETTING" | jq -e '.network.dns_filter == true' >/dev/null
     then
         # Проверка, разрешён ли IPv6
 
         if [ "$IPv6" != "false" ]; then
-            for ip6 in $(echo "$js_SETTING" | jq -r '.network.dns.IPv6[]'); do
-                if ! ip6tables -t nat -C "${chain_name}" -d "$ip6" -p tcp -m tcp ! --dport 53 -j RETURN 2>/dev/null; then
-                    ip6tables -w -t nat    -A "${chain_name}" -d "$ip6" -p tcp -m tcp ! --dport 53 -j RETURN
+            for ip6 in $(echo "$js_SETTING" | jq -r '.network.IPv6_exclusions[]'); do
+                if ! ip6tables -t nat -C "${3}" -d "$ip6" -j RETURN 2>/dev/null; then
+                  ip6tables -w -t nat    -A "${3}" -d "$ip6" -j RETURN
+                  debug "[OK] IP ${ip6} из IPv6_exclusions был внесен в (таблица: ${2}) цепи ${3}"
+                else
+                  debug "[FAIL] IP ${ip6} из IPv6_exclusions был внесен в (таблица: ${2}) цепи ${3}"
                 fi
-                if ! ip6tables -t nat -C "${chain_name}" -d "$ip6" -p udp -m udp --dport 53 -j RETURN 2>/dev/null; then
-                    ip6tables -w -t nat    -A "${chain_name}" -d "$ip6" -p udp -m udp --dport 53 -j RETURN
-                fi
-                debug "DNS таблица цепи ${chain_name} для ${ip6} создана"
             done
         fi
     fi
 
     if [ "${1}" = "ip6tables" ] \
     && [ "${2}" = "mangle" ] \
-    && ip6tables -t mangle -nL "${chain_name}" >/dev/null 2>&1 \
-    && echo "$js_SETTING" | jq -e '.network.dns.dns_filter == true' >/dev/null
+    && ip6tables -t mangle -nL "${3}" >/dev/null 2>&1 \
+    && echo "$js_SETTING" | jq -e '.network.dns_filter == true' >/dev/null
     then
         # Проверка, разрешён ли IPv6
 
         if [ "$IPv6" != "false" ]; then
-            for ip6 in $(echo "$js_SETTING" | jq -r '.network.dns.IPv6[]'); do
-                if ! ip6tables -t mangle -C "${chain_name}" -d "$ip6" -p tcp -m tcp --dport 53 -j RETURN 2>/dev/null; then
-                    ip6tables -w -t mangle -A "${chain_name}" -d "$ip6" -p tcp -m tcp --dport 53 -j RETURN
+            for ip6 in $(echo "$js_SETTING" | jq -r '.network.IPv6_exclusions[]'); do
+                if ! ip6tables -t mangle -C "${3}" -d "$ip6" -j RETURN 2>/dev/null; then
+                  ip6tables -w -t mangle -A "${3}" -d "$ip6" -j RETURN
+                  debug "[OK] IP ${ip6} из IPv6_exclusions был внесен в (таблица: ${2}) цепи ${3}"
+                else
+                  debug "[FAIL] IP ${ip6} из IPv6_exclusions был внесен в (таблица: ${2}) цепи ${3}"
                 fi
-                if ! ip6tables -t mangle -C "${chain_name}" -d "$ip6" -p udp -m udp ! --dport 53 -j RETURN 2>/dev/null; then
-                    ip6tables -w -t mangle -A "${chain_name}" -d "$ip6" -p udp -m udp ! --dport 53 -j RETURN
-                fi
-                debug "DNS таблица цепи ${chain_name} для ${ip6} создана"
             done
         fi
     fi
@@ -490,7 +486,7 @@ init_tables_nat(){
     echo "Ошибка: Нет портов в port_forwarding_list!" >&2
     exit 1
     fi
-    if echo "$js_SETTING" | jq -e '.network.dns.dns_filter' > /dev/null; then
+    if echo "$js_SETTING" | jq -e '.network.dns_filter' > /dev/null; then
     port_list="53,${port_list}"
     fi
     # Безопасно достаём диапазоны портов или пустой список
@@ -509,7 +505,8 @@ init_tables_nat(){
         "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp --dport "$range" -j ${chain_name}
       done
         #DNS
-      init_dns_tables "$family" "nat"
+      init_exclusions_ip "$family" "nat" "${chain_name}"
+      debug "#PREROUTING NAT ($family)"
 
       [ "$family" = "iptables" ] && add_ipv4tables_exclusions "${chain_name}" "nat"
       [ "$family" = "ip6tables" ] && add_ipv6tables_exclusions "${chain_name}" "nat"
@@ -536,7 +533,7 @@ init_tables_mangle(){
     echo "Ошибка: Нет портов в port_forwarding_list!" >&2
     exit 1
     fi
-    if echo "$js_SETTING" | jq -e '.network.dns.dns_filter' > /dev/null; then
+    if echo "$js_SETTING" | jq -e '.network.dns_filter' > /dev/null; then
     port_list="53,${port_list}"
     fi
     # Безопасно достаём диапазоны портов или пустой список
@@ -557,8 +554,8 @@ init_tables_mangle(){
         "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp --dport "$range" -j ${chain_name}
       done
 
-      #DNS
-      init_dns_tables "$family" "mangle"
+      #Exclusions_IP
+      init_exclusions_ip "$family" "mangle" "${chain_name}"
 
       [ "$family" = "iptables" ] && add_ipv4tables_exclusions "${chain_name}" "mangle"
       [ "$family" = "ip6tables" ] && add_ipv6tables_exclusions "${chain_name}" "mangle"
@@ -572,6 +569,7 @@ init_tables_mangle(){
     if ! "${family}" -t mangle -nL ${chain_name_output} >/dev/null 2>&1; then
       "${family}" -w -t mangle -N ${chain_name_output}
       debug "#OUTPUT mangle ($family)"
+      init_exclusions_ip "$family" "mangle" "${chain_name_output}"
       [ "$family" = "iptables" ] && add_ipv4tables_exclusions "${chain_name_output}" "mangle"
       [ "$family" = "ip6tables" ] && add_ipv6tables_exclusions "${chain_name_output}" "mangle"
       # ! --uid-owner 0 — правило применяется ко всем пользователям, кроме root (UID 0).
@@ -647,13 +645,6 @@ add_ipv4tables_exclusions() {
         224.0.0.0/4             # Multicast (групповая рассылка)
         240.0.0.0/4             # Зарезервировано для будущего
     "
-    # Затем добавляем динамические адреса
-    excluded_ips=$(get_exclude_ip4)
-    if [ -n "$excluded_ips" ]; then
-        ipv4_list="$ipv4_list
-        # Объеденяем все исключения
-        $excluded_ips"
-    fi
 
     # Фильтр: удаляем всё, что после '#', затем обрезаем пробелы
     echo "$ipv4_list" | while read -r line; do
@@ -663,12 +654,24 @@ add_ipv4tables_exclusions() {
         ip=$(echo "$line" | sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
         [ -z "$ip" ] && continue  # Пропускаем пустые строки
 
-        # Проверяем, не существует ли правило уже
-        if ! iptables -w -t "${2}" -C "${1}" -d "$ip" -j RETURN >/dev/null 2>&1; then
-            iptables -w -t "${2}" -A "${1}" -d "$ip" -j RETURN >> "${LOG_FILE}" 2>&1
-            debug "[OK] Добавлено исключение: $ip (таблица: $2)"
+        if [ "${2}" = "mangle" ] \
+        && echo "$js_SETTING" | jq -e '.network.dns_filter' > /dev/null
+        then
+          # Проверяем, не существует ли правило уже
+          if ! iptables -w -t "${2}" -C "${1}" -d "$ip" -p udp -m udp ! --dport 53  -j RETURN >/dev/null 2>&1; then
+              iptables -w -t "${2}" -A "${1}" -d "$ip" -p udp -m udp ! --dport 53  -j RETURN >> "${LOG_FILE}" 2>&1
+              debug "[OK] Добавлено исключение: $ip (таблица: $2)"
+          else
+              debug "[Пропуск] Правило для $ip уже существует в таблице $2"
+          fi
         else
-            debug "[Пропуск] Правило для $ip уже существует в таблице $2"
+          # Проверяем, не существует ли правило уже
+          if ! iptables -w -t "${2}" -C "${1}" -d "$ip" -j RETURN >/dev/null 2>&1; then
+              iptables -w -t "${2}" -A "${1}" -d "$ip" -j RETURN >> "${LOG_FILE}" 2>&1
+              debug "[OK] Добавлено исключение: $ip (таблица: $2)"
+          else
+              debug "[Пропуск] Правило для $ip уже существует в таблице $2"
+          fi
         fi
     done
 }
@@ -724,15 +727,6 @@ add_ipv6tables_exclusions() {
         ff00::/8                 # Multicast (аналог 224.0.0.0/4)
     "
 
-    # Затем добавляем динамические адреса
-    excluded_ips=$(get_exclude_ip6)
-    if [ -n "$excluded_ips" ]; then
-        ipv6_list="$ipv6_list
-        # Объеденяем все исключения
-        $excluded_ips"
-    fi
-
-
     # Фильтр: удаляем всё, что после '#', затем обрезаем пробелы
     echo "$ipv6_list" | while read -r line; do
         # Удаляем комментарии и лишние пробелы
@@ -741,12 +735,24 @@ add_ipv6tables_exclusions() {
         ip=$(echo "$line" | sed -e 's/#.*//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
         [ -z "$ip" ] && continue  # Пропускаем пустые строки
 
-        # Проверяем, не существует ли правило уже
-        if ! ip6tables -w -t "${2}" -C "${1}" -d "$ip" -j RETURN >/dev/null 2>&1; then
-            ip6tables -w -t "${2}" -A "${1}" -d "$ip" -j RETURN >> "${LOG_FILE}" 2>&1
-            debug "[OK] Добавлено исключение: $ip (таблица: $2)"
+        if [ "${2}" = "mangle" ] \
+        && echo "$js_SETTING" | jq -e '.network.dns_filter' > /dev/null
+        then
+          # Проверяем, не существует ли правило уже
+          if ! ip6tables -w -t "${2}" -C "${1}" -d "$ip" -p udp -m udp ! --dport 53  -j RETURN >/dev/null 2>&1; then
+              ip6tables -w -t "${2}" -A "${1}" -d "$ip" -p udp -m udp ! --dport 53  -j RETURN >> "${LOG_FILE}" 2>&1
+              debug "[OK] Добавлено исключение: $ip (таблица: $2)"
+          else
+              debug "[Пропуск] Правило для $ip уже существует в таблице $2"
+          fi
         else
-            debug "[Пропуск] Правило для $ip уже существует в таблице $2"
+          # Проверяем, не существует ли правило уже
+          if ! ip6tables -w -t "${2}" -C "${1}" -d "$ip" -j RETURN >/dev/null 2>&1; then
+              ip6tables -w -t "${2}" -A "${1}" -d "$ip" -j RETURN >> "${LOG_FILE}" 2>&1
+              debug "[OK] Добавлено исключение: $ip (таблица: $2)"
+          else
+              debug "[Пропуск] Правило для $ip уже существует в таблице $2"
+          fi
         fi
     done
 }
