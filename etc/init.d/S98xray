@@ -500,6 +500,11 @@ init_tables_nat(){
       "${family}" -w -t nat -N ${chain_name} >> "${LOG_FILE}" 2>&1
       debug "#PREROUTING NAT ($family)"
       "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp -m multiport --dports  ${port_list} -j ${chain_name} >>"${LOG_FILE}" 2>&1
+      #"${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp -m multiport --dport  53 -j REDIRECT --to-port 5345 >>"${LOG_FILE}" 2>&1
+      #"${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dport  53 -j REDIRECT --to-port 5345 >>"${LOG_FILE}" 2>&1
+      #"${family}" -w -t nat -A OUTPUT -p tcp -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -m multiport --dport 53 -j REDIRECT --to-ports 5345 >>"${LOG_FILE}" 2>&1
+      #"${family}" -w -t nat -A OUTPUT -p udp -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -m multiport --dport 53 -j REDIRECT --to-ports 5345 >>"${LOG_FILE}" 2>&1
+
       echo "$port_ranges" | while read -r range; do
         [ -n "$range" ] || continue
         "${family}" -w -t nat -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p tcp --dport "$range" -j ${chain_name}
