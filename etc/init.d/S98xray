@@ -402,8 +402,7 @@ init_exclusions_ip(){
     # Проверка наличия цепочек и включенного dns_filter
     if [ "${1}" = "iptables" ] \
     && [ "${2}" = "nat" ] \
-    && iptables -t nat -nL "${3}" >/dev/null 2>&1 \
-    && echo "$js_SETTING" | jq -e '.network.dns_filter == true' >/dev/null
+    && iptables -t nat -nL "${3}" >/dev/null 2>&1
     then
         # IPv4
         for ip in $(echo "$js_SETTING" | jq -r '.network.IPv4_exclusions[]'); do
@@ -418,8 +417,7 @@ init_exclusions_ip(){
 
     if [ "${1}" = "iptables" ] \
     && [ "${2}" = "mangle" ] \
-    && iptables -t mangle -nL "${3}" >/dev/null 2>&1 \
-    && echo "$js_SETTING" | jq -e '.network.dns_filter == true' >/dev/null
+    && iptables -t mangle -nL "${3}" >/dev/null 2>&1
     then
         # IPv4
         for ip in $(echo "$js_SETTING" | jq -r '.network.IPv4_exclusions[]'); do
@@ -434,8 +432,7 @@ init_exclusions_ip(){
 
     if [ "${1}" = "ip6tables" ] \
     && [ "${2}" = "nat" ] \
-    && ip6tables -t nat -nL "${3}" >/dev/null 2>&1 \
-    && echo "$js_SETTING" | jq -e '.network.dns_filter == true' >/dev/null
+    && ip6tables -t nat -nL "${3}" >/dev/null 2>&1
     then
         # Проверка, разрешён ли IPv6
 
@@ -453,8 +450,7 @@ init_exclusions_ip(){
 
     if [ "${1}" = "ip6tables" ] \
     && [ "${2}" = "mangle" ] \
-    && ip6tables -t mangle -nL "${3}" >/dev/null 2>&1 \
-    && echo "$js_SETTING" | jq -e '.network.dns_filter == true' >/dev/null
+    && ip6tables -t mangle -nL "${3}" >/dev/null 2>&1
     then
         # Проверка, разрешён ли IPv6
 
@@ -553,7 +549,7 @@ init_tables_mangle(){
       "${family}" -w -t mangle -N ${chain_name}
       debug "#PREROUTING MANGLE ($family)"
       "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports  ${port_list} -j ${chain_name} >> "${LOG_FILE}" 2>&1
-      "${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} >> "${LOG_FILE}" 2>&1
+      #"${family}" -w -t mangle -A PREROUTING -m connmark ! --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp -m multiport --dports 53 -j ${chain_name} >> "${LOG_FILE}" 2>&1
       echo "$port_ranges" | while read -r range; do
         [ -n "$range" ] || continue
         "${family}" -w -t mangle -A PREROUTING -m connmark --mark ${policy_mark} -m conntrack ! --ctstate INVALID -p udp --dport "$range" -j ${chain_name}
@@ -619,6 +615,8 @@ get_exclude_ip4() {
 }
 
 add_ipv4tables_exclusions() {
+
+    return 0
 
     # Проверяем существование цепочки перед началом работы
     if ! check_chain_ipv4 "${1}" "${2}"; then
@@ -711,6 +709,8 @@ get_exclude_ip6() {
 
 add_ipv6tables_exclusions() {
 
+    return 0
+
     # Проверяем существование цепочки перед началом работы
     if ! check_chain_ipv6 "${1}" "${2}"; then
         exit 1
@@ -796,7 +796,7 @@ database_updates(){
 
   # Проверка, разрешена ли загрузка
   download=$(echo "$js_SETTING" | jq -r '.database.download // "false"')
-  path_data=$(echo "$js_SETTING" | jq -r '.path_data // "/opt/etc/xray/dat"')
+  path_data=$(echo "$js_SETTING" | jq -r '.database.path_data // "/opt/etc/xray/dat"')
   # Удаление завершающего слэша (если есть), затем добавление одного
   path_data="${path_data%/}/"
 
@@ -939,9 +939,12 @@ case $ACTION in
       }
       name_client=$(echo "$js_SETTING" | jq -r '.client.name')
       echo -e " ${name_client} ${color_green}запускается...${color_reset}"
+
+      path_data="$(echo "$js_SETTING" | jq -r '.database.path_data // "/opt/etc/xray/dat"' | sed 's:/*$::')"
+      path_configs="$(echo "$js_SETTING" | jq -r '.client.path_config // "/opt/etc/xray/dat"' | sed 's:/*$::')"
       export XRAY_RAY_BUFFER_SIZE=4
-      export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
-      export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
+      export XRAY_LOCATION_ASSET="${path_data}"
+      export XRAY_LOCATION_CONFDIR="${path_configs}"
       {
           echo -e "\n=== $(date) === xray client info ==="
           xray run &
@@ -1024,9 +1027,11 @@ case $ACTION in
   fast_restart)
       busybox killall -q -9 "$(echo "$js_SETTING" | jq -r '.client.name')"
       "$0" status
+      path_data="$(echo "$js_SETTING" | jq -r '.database.path_data // "/opt/etc/xray/dat"' | sed 's:/*$::')"
+      path_configs="$(echo "$js_SETTING" | jq -r '.client.path_config // "/opt/etc/xray/dat"' | sed 's:/*$::')"
       export XRAY_RAY_BUFFER_SIZE=4
-      export XRAY_LOCATION_ASSET=/opt/etc/xray/dat
-      export XRAY_LOCATION_CONFDIR=/opt/etc/xray/configs
+      export XRAY_LOCATION_ASSET="${path_data}"
+      export XRAY_LOCATION_CONFDIR="${path_configs}"
       {
           echo -e "\n=== $(date) === xray client info ==="
           xray run &
