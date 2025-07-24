@@ -2,7 +2,8 @@
   "client":
   {
     "name": "xray",
-    "path_config": "/opt/etc/xray/configs"
+    "path_config": "/opt/etc/xray/configs",
+    "lockFile": "/opt/tmp/xray-xwave.lock"
   },
   "app":
   {
@@ -28,7 +29,7 @@
       "1024:1055",
       "1000:1099"
     ],
-    "dns_filter": true,
+    "dns_filter": false,
     "IPv6": false,
     "IPv6_exclusions":
     [
