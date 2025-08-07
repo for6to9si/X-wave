@@ -29,7 +29,6 @@
       "1024:1055",
       "1000:1099"
     ],
-    "dns_filter": false,
     "IPv6": false,
     "IPv6_exclusions":
     [

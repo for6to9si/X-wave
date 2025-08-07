@@ -551,7 +551,7 @@ init_tables_nat(){
     echo "Ошибка: Нет портов в port_forwarding_list!" >&2
     exit 1
     fi
-    if echo "$js_SETTING" | jq -e '.network.dns_filter' > /dev/null; then
+    if echo "$js_SETTING" | jq -e '.network.dns_filter // false' > /dev/null; then
     port_list="53,${port_list}"
     fi
     # Безопасно достаём диапазоны портов или пустой список
@@ -603,7 +603,7 @@ init_tables_mangle(){
     echo "Ошибка: Нет портов в port_forwarding_list!" >&2
     exit 1
     fi
-    if echo "$js_SETTING" | jq -e '.network.dns_filter' > /dev/null; then
+    if echo "$js_SETTING" | jq -e '.network.dns_filter // false' > /dev/null; then
     port_list="53,${port_list}"
     fi
     # Безопасно достаём диапазоны портов или пустой список
@@ -727,7 +727,7 @@ add_ipv4tables_exclusions() {
         [ -z "$ip" ] && continue  # Пропускаем пустые строки
 
         if [ "${2}" = "mangle" ] \
-        && echo "$js_SETTING" | jq -e '.network.dns_filter' > /dev/null
+        && echo "$js_SETTING" | jq -e '.network.dns_filter // false' > /dev/null
         then
           # Проверяем, не существует ли правило уже
           if ! iptables -w -t "${2}" -C "${1}" -d "$ip" -p udp -m udp ! --dport 53  -j RETURN >/dev/null 2>&1; then
@@ -810,7 +810,7 @@ add_ipv6tables_exclusions() {
         [ -z "$ip" ] && continue  # Пропускаем пустые строки
 
         if [ "${2}" = "mangle" ] \
-        && echo "$js_SETTING" | jq -e '.network.dns_filter' > /dev/null
+        && echo "$js_SETTING" | jq -e '.network.dns_filter // false' > /dev/null
         then
           # Проверяем, не существует ли правило уже
           if ! ip6tables -w -t "${2}" -C "${1}" -d "$ip" -p udp -m udp ! --dport 53  -j RETURN >/dev/null 2>&1; then
