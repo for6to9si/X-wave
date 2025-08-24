@@ -1,0 +1,115 @@
+{
+    "dns":
+    {
+        "tag": "dns-in",
+        "servers":
+        [
+            "https+local://cloudflare-dns.com/dns-query",
+            "https+local://8.8.4.4/dns-query",
+            "https+local://router.comss.one/dns-query",
+            "quic+local://94.140.15.15:853",
+            "quic+local://dns.alidns.com:853",
+            "https+local://protective.joindns4.eu/dns-query",
+            "https+local://1.1.1.1/dns-query",
+            "https+local://149.112.112.10/dns-query",
+            {
+                "address": "quic+local://94.140.15.15:853",
+                "domains":
+                [
+                    "themoviedb.org",
+                    "www.themoviedb.org",
+                    "domain:browserleaks.org",
+                    "domain:dnsleaktest.com",
+                    "tmdb.org",
+                    "image.tmdb.org",
+                    "api.themoviedb.org",
+                    "tmdb-image-prod.b-cdn.net",
+                    "media.themoviedb.org",
+                    "tmdb-web-image-prod.b-cdn.net",
+                    "domain:goproxy.io",
+                    "domain:vscodium.com"
+                ],
+                "skipFallback": false
+            },
+            {
+                "address": "77.88.8.8",
+                "port": 53,
+                "domains":
+                [
+                    "lkfl2.nalog.ru",
+                    "domain:nalog.ru",
+                    "googlevideo.com",
+                    "yt3.ggpht.com",
+                    "youtube.com",
+                    "i.ytimg.com",
+                    "youtubei.googleapis.com",
+                    "yt3.ggpht.com",
+                    "yt3.googleusercontent.com",
+                    "google.com",
+                    "googleapis.com",
+                    "gstatic.com",
+                    "youtu.be",
+                    "yastatic.net",
+                    "yandex.net"
+                ],
+                "skipFallback": true
+            }
+        ],
+        "clientIp": "1.2.3.4",
+        "queryStrategy": "UseIPv4",
+        "disableCache": false,
+        "disableFallback": false,
+        "disableFallbackIfMatch": false
+    },
+    "inbounds":
+    [
+        {
+            "tag": "dns-myrouter",
+            "port": 53,
+            "listen": "192.168.2.1",
+            "protocol": "dokodemo-door",
+            "settings":
+            {
+                "address": "127.0.0.5",
+                "port": 53,
+                "network": "tcp,udp",
+                "followRedirect": false
+            }
+        },
+        {
+            "tag": "dns-anyway",
+            "port": 53,
+            "protocol": "dokodemo-door",
+            "settings":
+            {
+                "address": "127.0.0.5",
+                "port": 53,
+                "network": "tcp,udp",
+                "followRedirect": false
+            }
+        }
+    ],
+    "outbounds":
+    [
+        {
+            "tag": "dns-out",
+            "protocol": "dns"
+        }
+    ],
+    "routing":
+    {
+        "rules":
+        [
+            {
+                "type": "field",
+                "inboundTag":
+                [
+                    "dns-anyway",
+                    "dns-myrouter"
+                ],
+                "port": 53,
+                "outboundTag": "dns-out"
+            }
+        ]
+    }
+}
