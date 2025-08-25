@@ -80,6 +80,8 @@ jobs:
       run: |
         unzip Xray-linux-${{ matrix.arch }}.zip LICENSE -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
         unzip Xray-linux-${{ matrix.arch }}.zip LICENSE -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray
+        ls -al ./
+        ls -R ./
 
     - name: Package IPK
       run: |
