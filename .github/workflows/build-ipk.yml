@@ -76,6 +76,36 @@ jobs:
         cp ./sbin/traffic.sh xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/
         chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin/traffic.sh
 
+    - name: Add postinst script, add policy Swave
+      run: |
+        cat > xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/postinst <<'EOF'
+        #!/bin/sh
+        case "$1" in
+         configure)
+             ndmc -c 'ip policy Xwave'
+             ndmc -c 'ip policy Xwave description Xwave'
+             ndmc -c 'ip policy Xwave permit global ISP'
+             ndmc -c 'system configuration save'
+         ;;
+        esac
+        exit 0
+        EOF
+        chmod 755 xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/postinst
+
+    - name: Add postrm script
+      run: |
+        cat > xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/postrm <<'EOF'
+        #!/bin/sh
+        case "$1" in
+         remove)
+             ndmc -c 'ip no policy Xwave'
+             ndmc -c 'system configuration save'
+         ;;
+        esac
+        exit 0
+        EOF
+        chmod 755 xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/postrm
+
     - name: Include xray license and copyright
       run: |
         unzip Xray-linux-${{ matrix.arch }}.zip LICENSE -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
