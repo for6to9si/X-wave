@@ -174,19 +174,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for f in artifacts/*/xray_*.ipk; do
-            ver=$(echo "$f" | sed -E 's/.*xray_([0-9.]+)_.*/\1/')
+          # Группируем артефакты по версии
+          for ver in $(ls artifacts/*/xray_*.ipk | sed -E 's/.*xray_([0-9.]+)_.*/\1/' | sort -u); do
             tag="v$ver"
-            echo "Creating release $tag"
+            files=$(ls artifacts/*/xray_${ver}_*.ipk)
+
+            echo "Creating release $tag with files: $files"
 
             if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
-              gh release create "$tag" "$f" \
+              gh release create "$tag" $files \
                 --repo "$GITHUB_REPOSITORY" \
                 --title "Release $tag" \
                 --notes "Automated build" \
                 --prerelease || echo "Release $tag already exists"
             else
-              gh release create "$tag" "$f" \
+              gh release create "$tag" $files \
                 --repo "$GITHUB_REPOSITORY" \
                 --title "Release $tag" \
                 --notes "Automated build" || echo "Release $tag already exists"
