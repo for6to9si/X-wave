@@ -28,10 +28,10 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.copy }}" = "true" ]; then
             versions=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases \
-              | jq -r '.[].tag_name' \
+              | jq -r '.[] | select(.prerelease == false) | .tag_name' \
               | grep '^v[0-9]\+' \
               | sed 's/^v//' \
-              | awk -F. '($1 > 25) || ($1 == 25 && $2 >= 9)' \
+              | awk -F. '($1 > 25) || ($1 == 25 && $2 >= 4)' \
               | sort -V)
 
             # Преобразуем список в JSON-массив одной строкой
@@ -94,6 +94,7 @@ jobs:
         Version: ${{ matrix.version }}
         Architecture: $arch_pkg
         Section: net
+        URL: https://xtls.github.io/
         Description: A minimalistic tool to automate Xray setup on Keenetic router systems..
         License: GPL-3.0 license
         Maintainer: for6to9si <for6to9si@gmail.com>
@@ -182,7 +183,8 @@ jobs:
             echo "Generating changelog from $PREV_TAG to HEAD"
             git log "$PREV_TAG"..HEAD --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
           fi
-          # echo "Copied build from XTLS/Xray-core" > changelog.txt
+          
+          echo "Copied build from XTLS/Xray-core" > changelog.txt
 
           echo "Changelog:"
           cat changelog.txt
