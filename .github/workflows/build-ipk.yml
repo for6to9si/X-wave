@@ -31,7 +31,7 @@ jobs:
               | jq -r '.[].tag_name' \
               | grep '^v[0-9]\+' \
               | sed 's/^v//' \
-              | awk '$1 >= 24' \
+              | awk -F. '($1 > 25) || ($1 == 25 && $2 >= 4)' \
               | sort -V)
 
             # Преобразуем список в JSON-массив одной строкой
@@ -79,12 +79,20 @@ jobs:
 
         cp ./etc/init.d/S98xray xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
         chmod +x xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
+        
+        # Маппинг arch → Architecture
+        case "${{ matrix.arch }}" in
+          arm64-v8a) arch_pkg="aarch64-3.10" ;;
+          mips32le)  arch_pkg="mipsel-3.4" ;;
+          mips32)    arch_pkg="mips-3.4" ;;
+          *)         arch_pkg="${{ matrix.arch }}" ;; # fallback
+        esac
 
         cat > xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
         Package: xray-tg-installer
         Depends: libc,libssp,librt,libpthread,libpthread,jq,iptables,cron,curl
         Version: ${{ matrix.version }}
-        Architecture: mipsel-3.4
+        Architecture: $arch_pkg
         Section: net
         Description: A minimalistic tool to automate Xray setup on Keenetic router systems..
         License: GPL-3.0 license
