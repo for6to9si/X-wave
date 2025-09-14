@@ -3,16 +3,8 @@ name: Build xray IPK packages
 on:
   workflow_dispatch:
     inputs:
-      prerelease:
-        description: 'Is this a prerelease?'
-        required: true
-        default: 'false'
-        type: choice
-        options:
-          - 'true'
-          - 'false'
       copy:
-        description: 'Build all releases starting from v24'
+        description: 'Build all releases'
         required: false
         default: 'false'
         type: choice
@@ -57,7 +49,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arch: [arm64-v8a, mips32le]
+        arch: [arm64-v8a, mips32le, mips32]
         version: ${{ fromJson(needs.prepare-versions.outputs.versions) }}
     steps:
     - name: Checkout repository
@@ -181,12 +173,11 @@ jobs:
 
             echo "Creating release $tag with files: $files"
 
-            if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+            if [ "${{ github.event.inputs.copy }}" = "true" ]; then
               gh release create "$tag" $files \
                 --repo "$GITHUB_REPOSITORY" \
-                --title "Release $tag" \
-                --notes "Automated build" \
-                --prerelease || echo "Release $tag already exists"
+                --title "Release $tag (copied)" \
+                --notes "Copied build from XTLS/Xray-core" || echo "Release $tag already exists"
             else
               gh release create "$tag" $files \
                 --repo "$GITHUB_REPOSITORY" \
