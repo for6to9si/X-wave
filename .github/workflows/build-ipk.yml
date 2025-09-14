@@ -162,6 +162,22 @@ jobs:
         with:
           path: artifacts
 
+      - name: Generate changelog
+        run: |
+          # Найдём предыдущий тег по дате создания
+          PREV_TAG=$(git tag --sort=-creatordate | tail -n 2 | head -n 1 || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found. Logging all history."
+            git log --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
+          else
+            echo "Generating changelog from $PREV_TAG to HEAD"
+            git log "$PREV_TAG"..HEAD --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
+          fi
+
+          echo "Changelog:"
+          cat changelog.txt
+
       - name: Create releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -177,12 +193,12 @@ jobs:
               gh release create "$tag" $files \
                 --repo "$GITHUB_REPOSITORY" \
                 --title "Release $tag (copied)" \
-                --notes "Copied build from XTLS/Xray-core" || echo "Release $tag already exists"
+                --notes-file changelog.txt || echo "Release $tag already exists"
             else
               gh release create "$tag" $files \
                 --repo "$GITHUB_REPOSITORY" \
                 --title "Release $tag" \
-                --notes "Automated build" || echo "Release $tag already exists"
+                --notes-file changelog.txt || echo "Release $tag already exists"
             fi
           done
 
