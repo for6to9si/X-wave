@@ -170,21 +170,21 @@ jobs:
         with:
           path: artifacts
 
-      - name: Generate changelog
-        run: |
-          # Найдём предыдущий тег по дате создания
-          PREV_TAG=$(git tag --sort=-creatordate | tail -n 2 | head -n 1 || echo "")
-
-          if [ -z "$PREV_TAG" ]; then
-            echo "No previous tag found. Logging all history."
-            git log --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
-          else
-            echo "Generating changelog from $PREV_TAG to HEAD"
-            git log "$PREV_TAG"..HEAD --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
-          fi
-
-          echo "Changelog:"
-          cat changelog.txt
+#      - name: Generate changelog
+#        run: |
+#          # Найдём предыдущий тег по дате создания
+#          PREV_TAG=$(git tag --sort=-creatordate | tail -n 2 | head -n 1 || echo "")
+#
+#          if [ -z "$PREV_TAG" ]; then
+#            echo "No previous tag found. Logging all history."
+#            git log --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
+#          else
+#            echo "Generating changelog from $PREV_TAG to HEAD"
+#            git log "$PREV_TAG"..HEAD --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
+#          fi
+#
+#          echo "Changelog:"
+#          cat changelog.txt
 
       - name: Create releases
         env:
