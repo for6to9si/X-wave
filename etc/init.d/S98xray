@@ -7,7 +7,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Copyright (C) 2024 for6to9si@gmail.com. All rights reserved.
+# Copyright (C) 2025 for6to9si@gmail.com. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 # @author: for6to9si@gmail.com
-# @version: 0.0.15
+# @version: 0.0.16
 
 ENABLED=yes
 DEBUG=true

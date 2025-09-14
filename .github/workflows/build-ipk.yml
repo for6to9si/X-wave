@@ -11,18 +11,51 @@ on:
         options:
           - 'true'
           - 'false'
-      
+      copy:
+        description: 'Build all releases starting from v24'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
 permissions:
   contents: write
   pages: write
   id-token: write
 
 jobs:
+  prepare-versions:
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.set-versions.outputs.versions }}
+    steps:
+      - name: Determine versions
+        id: set-versions
+        run: |
+          if [ "${{ github.event.inputs.copy }}" = "true" ]; then
+            versions=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases \
+              | jq -r '.[].tag_name' \
+              | grep '^v[0-9]\+' \
+              | sed 's/^v//' \
+              | awk '$1 >= 24' \
+              | sort -V)
+          else
+            versions=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          fi
+
+          echo "Building versions: $versions"
+          versions_json=$(echo "$versions" | jq -R . | jq -s .)
+          echo "versions=$versions_json" >> $GITHUB_OUTPUT  
+
   build-ipk:
+    needs: prepare-versions
     runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [arm64-v8a, mips32le]
+        version: ${{ fromJson(needs.prepare-versions.outputs.versions) }}
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -32,51 +65,44 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y tar gzip jq unzip fakeroot
 
-    - name: Determine version
-      id: version
-      run: |
-        VERSION=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name' | sed 's/^v//')
-        echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        echo "Using version: ${VERSION}"
-
     - name: Download Xray-core
       run: |
-        wget https://github.com/XTLS/Xray-core/releases/download/v${{ steps.version.outputs.version }}/Xray-linux-${{ matrix.arch }}.zip
+        wget https://github.com/XTLS/Xray-core/releases/download/v${{ matrix.version }}/Xray-linux-${{ matrix.arch }}.zip
 
     - name: Create IPK package structure
       run: |
-        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
-        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d
-        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d
-        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray/configs
-        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray/dat
-        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave
-        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/var/log/xwave
-        mkdir -p xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/sbin
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/init.d
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/configs
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/dat
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xwave
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/var/log/xwave
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL
+        
+        unzip Xray-linux-${{ matrix.arch }}.zip xray -d xray-${{ matrix.version }}-${{ matrix.arch }}/opt/sbin
 
-        unzip Xray-linux-${{ matrix.arch }}.zip xray -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/sbin
+        cp ./etc/init.d/S98xray xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
+        chmod +x xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
 
-        cp ./etc/init.d/S98xray xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
-        chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/init.d/S98xray
-
-        cat > xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
+        cat > xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/control <<EOF
         Package: xray-tg-installer
         Depends: libc,libssp,librt,libpthread,libpthread,jq,iptables,cron,curl
-        Version: ${{ steps.version.outputs.version }}
+        Version: ${{ matrix.version }}
         Architecture: mipsel-3.4
         Section: net
         Description: A minimalistic tool to automate Xray setup on Keenetic router systems..
         License: GPL-3.0 license
         Maintainer: for6to9si <for6to9si@gmail.com>
         EOF
-        
-        cp ./etc/ndm/netfilter.d/000-xwave.sh xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
-        chmod +x xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
-        cp ./etc/xwave/settings.json xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xwave/example.json
+
+        cp ./etc/ndm/netfilter.d/000-xwave.sh xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
+        chmod +x xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
+        cp ./etc/xwave/settings.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xwave/example.json
 
     - name: Add postinst script, add policy Xwave
       run: |
-        cat > xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/postinst <<'EOF'
+        cat > xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/postinst <<'EOF'
         #!/bin/sh
         case "$1" in
          configure)
@@ -88,11 +114,11 @@ jobs:
         esac
         exit 0
         EOF
-        chmod 755 xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/postinst
+        chmod 755 xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/postinst
 
     - name: Add postrm script
       run: |
-        cat > xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/postrm <<'EOF'
+        cat > xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/postrm <<'EOF'
         #!/bin/sh
         case "$1" in
          remove)
@@ -102,34 +128,28 @@ jobs:
         esac
         exit 0
         EOF
-        chmod 755 xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL/postrm
+        chmod 755 xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/postrm
 
     - name: Include xray license and copyright
       run: |
-        unzip Xray-linux-${{ matrix.arch }}.zip LICENSE -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/CONTROL
-        unzip Xray-linux-${{ matrix.arch }}.zip LICENSE -d xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}/opt/etc/xray
-        
+        unzip Xray-linux-${{ matrix.arch }}.zip LICENSE -d xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL
+        unzip Xray-linux-${{ matrix.arch }}.zip LICENSE -d xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray
+
     - name: Package IPK
       run: |
-        cd xray-${{ steps.version.outputs.version }}-${{ matrix.arch }}
+        cd xray-${{ matrix.version }}-${{ matrix.arch }}
         fakeroot tar -czf ../data.tar.gz ./opt/sbin ./opt/etc ./opt/var/log/xwave
         cd ./CONTROL
         fakeroot tar -czf ../../control.tar.gz *
         cd ..
         echo "2.0" > ../debian-binary
         cd ..
-        fakeroot tar -czf xray_${{ steps.version.outputs.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
-        
-    - name: Store build timestamp
-      run: echo "BUILD_TIME=$(date +'%T')" >> $GITHUB_ENV
-
-    - name: Deploy using stored timestamp
-      run: echo "Deploying at $BUILD_TIME"
+        fakeroot tar -czf xray_${{ matrix.version }}_${{ matrix.arch }}.ipk ./debian-binary ./control.tar.gz ./data.tar.gz
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: xray-${{ matrix.arch }}
+        name: xray-${{ matrix.version }}-${{ matrix.arch }}
         path: ./*.ipk
         if-no-files-found: error
 
@@ -142,59 +162,31 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Read version from S98xray file
-        id: generate_tag
-        run: |
-          VERSION_LINE=$(grep -E '^# @version:' ./etc/init.d/S98xray || true)
-          if [ -z "$VERSION_LINE" ]; then
-            echo "Version not found!" >&2
-            exit 1
-          fi
-          TAG_NAME="v$(echo "$VERSION_LINE" | sed -E 's/^# @version:[[:space:]]*//')"
-          echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
-      - name: Create Git tag and push
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git tag ${{ steps.generate_tag.outputs.tag_name }}
-          git push origin ${{ steps.generate_tag.outputs.tag_name }}
-
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Create release and upload artifacts (signed)
+      - name: Create releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=${{ steps.generate_tag.outputs.tag_name }}
-
-          # Найдём предыдущий тег по дате создания
-          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${TAG}$" | head -n 1 || echo "")
-
-          if [ -z "$PREV_TAG" ]; then
-            echo "No previous tag found. Logging all history."
-            git log --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
-          else
-            echo "Generating changelog from $PREV_TAG to HEAD"
-            git log "$PREV_TAG"..HEAD --pretty=format:'- [%h](https://github.com/${{ github.repository }}/commit/%H): %s' > changelog.txt
-          fi
-
-          echo "Changelog:"
-          cat changelog.txt
+          for f in artifacts/*/xray_*.ipk; do
+            ver=$(echo "$f" | sed -E 's/.*xray_([0-9.]+)_.*/\1/')
+            tag="v$ver"
+            echo "Creating release $tag"
 
             if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
-              gh release create "$TAG" artifacts/xray-*/xray_*.ipk \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Release $TAG" \
-              --notes-file changelog.txt \
-              --prerelease
+              gh release create "$tag" "$f" \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "Release $tag" \
+                --notes "Automated build" \
+                --prerelease || echo "Release $tag already exists"
             else
-              gh release create "$TAG" artifacts/xray-*/xray_*.ipk \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "Release $TAG" \
-              --notes-file changelog.txt 
+              gh release create "$tag" "$f" \
+                --repo "$GITHUB_REPOSITORY" \
+                --title "Release $tag" \
+                --notes "Automated build" || echo "Release $tag already exists"
             fi
+          done
 
