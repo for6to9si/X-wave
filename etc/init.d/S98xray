@@ -155,7 +155,6 @@ start_xray() {
 
     path_data="$(echo "$js_SETTING" | jq -r '.database.path_data // "/opt/etc/xray/dat"' | sed 's:/*$::')"
     path_configs="$(echo "$js_SETTING" | jq -r '.client.path_config // "/opt/etc/xray/dat"' | sed 's:/*$::')"
-    export XRAY_BUF_SPLICE=1
     export XRAY_RAY_BUFFER_SIZE=4
     export XRAY_LOCATION_ASSET="${path_data}"
     export XRAY_LOCATION_CONFDIR="${path_configs}"
