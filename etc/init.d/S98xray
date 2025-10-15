@@ -1054,6 +1054,9 @@ case $ACTION in
         firewall_ip6tables_mangle
       fi
       ;;
+  database_up)
+      database_updates
+      ;;
   refresh)
       logger -t "$(basename "$0")" "Refresh has been started"
       database_updates
