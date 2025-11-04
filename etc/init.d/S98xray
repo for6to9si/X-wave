@@ -155,13 +155,15 @@ start_xray() {
 
     path_data="$(echo "$js_SETTING" | jq -r '.database.path_data // "/opt/etc/xray/dat"' | sed 's:/*$::')"
     path_configs="$(echo "$js_SETTING" | jq -r '.client.path_config // "/opt/etc/xray/dat"' | sed 's:/*$::')"
-    export XRAY_RAY_BUFFER_SIZE=4
-    export XRAY_LOCATION_ASSET="${path_data}"
-    export XRAY_LOCATION_CONFDIR="${path_configs}"
 
     # Записываем информацию в лог и запускаем xray
-    echo -e "\n=== $(date) === xray client info ===" >> "${LOG_FILE}"
-    xray run >> "${LOG_FILE}" 2>&1 &
+    {
+      export XRAY_RAY_BUFFER_SIZE=4
+      export XRAY_LOCATION_ASSET="${path_data}"
+      export XRAY_LOCATION_CONFDIR="${path_configs}"
+      echo -e "\n=== $(date) === xray client info ==="
+      xray run
+    } >> "${LOG_FILE}" 2>&1 &
     XRAY_PID=$!
     # xray run &
 
