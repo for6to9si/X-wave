@@ -373,6 +373,9 @@ backup_config_xray() {
     BACKUP_BASE_DIR="/opt/backups/xray"
     TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
     BACKUP_DIR="${BACKUP_BASE_DIR}/${TIMESTAMP}"
+    SETTINGS_FILE="/opt/etc/xwave/settings.json"
+    SETTINGS_BACKUP_DIR="${BACKUP_DIR}/xwave"
+    ARCHIVE_FILE="${BACKUP_BASE_DIR}/xray-backup-${TIMESTAMP}.tar.gz"
 
     # Проверяем существование базовой директории
     if [ ! -d "$BACKUP_BASE_DIR" ]; then
@@ -380,7 +383,10 @@ backup_config_xray() {
         echo -n "Хотите создать её? (y/n): "
         read answer
         if [ "$answer" = "y" ] || [ "$answer" = "Y" ]; then
-            mkdir -p "$BACKUP_BASE_DIR"
+            mkdir -p "$BACKUP_BASE_DIR" || {
+                echo "Не удалось создать директорию $BACKUP_BASE_DIR"
+                return 1
+            }
             echo "Директория создана: $BACKUP_BASE_DIR"
         else
             echo "Операция отменена пользователем."
@@ -391,10 +397,32 @@ backup_config_xray() {
     # Создаём папку для нового бэкапа
     mkdir -p "$BACKUP_DIR"
 
-    # Копируем файлы
-    cp -r "$SOURCE_DIR/"* "$BACKUP_DIR/"
+    # Копируем файлы конфигурации sing-box
+    if [ -d "$SOURCE_DIR" ]; then
+        cp -r "$SOURCE_DIR/"* "$BACKUP_DIR/" 2>/dev/null
+        echo "Файлы конфигурации из $SOURCE_DIR скопированы."
+    else
+        echo "Источник $SOURCE_DIR не найден. Пропуск копирования конфигурации sing-box."
+    fi
 
-    echo "Бэкап успешно создан в: $BACKUP_DIR"
+    # Создаём поддиректорию для настроек swave
+    mkdir -p "$SETTINGS_BACKUP_DIR"
+
+    # Копируем settings.json отдельно
+    if [ -f "$SETTINGS_FILE" ]; then
+        cp "$SETTINGS_FILE" "$SETTINGS_BACKUP_DIR/" || echo "Ошибка копирования $SETTINGS_FILE"
+        echo "Файл $SETTINGS_FILE сохранён в $SETTINGS_BACKUP_DIR"
+    else
+        echo "Файл $SETTINGS_FILE не найден. Пропуск."
+    fi
+
+    # Архивация всего бэкапа
+    tar -czf "$ARCHIVE_FILE" -C "$BACKUP_BASE_DIR" "$TIMESTAMP" && echo "Архив создан: $ARCHIVE_FILE"
+
+    # Можно удалить временную папку после архивации (если не нужна)
+    rm -rf "$BACKUP_DIR"
+
+    echo "Бэкап успешно завершён."
 }
 
 IPv6=$(echo "$js_SETTING" | jq -r '.network.IPv6 // "false"')
