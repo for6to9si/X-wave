@@ -37,15 +37,13 @@ export PATH=/opt/bin:/opt/sbin:/usr/bin:/bin:/sbin:/usr/sbin
 
 
 # Путь к JSON-файлу с настройками
-if [ ! -f /opt/etc/xwave/settings.json ]; then
-    echo "Файл настроек /opt/etc/xwave/settings.json не найден."
-    echo "Пожалуйста, ознакомьтесь с примером настроек: /opt/etc/xwave/example.json"
+if [ ! -f /opt/etc/xwave/xwave-conf.json ]; then
+    echo "Файл настроек /opt/etc/xwave/xwave-conf.json не найден."
+    echo "Пожалуйста, ознакомьтесь с примером настроек: https://github.com/for6to9si/X-wave/wiki"
     echo "Отредактируйте его в соответствии с вашими требованиями,"
-    echo "затем переместите в нужное место командой:"
-    echo "  mv /opt/etc/xwave/example.json /opt/etc/xwave/settings.json"
     exit 1
 else
-    SETTING="/opt/etc/xwave/settings.json"
+    SETTING="/opt/etc/xwave/xwave-conf.json"
 fi
 
 get_clean_json() {
@@ -410,7 +408,7 @@ backup_config_xray() {
     # Создаём поддиректорию для настроек swave
     mkdir -p "$SETTINGS_BACKUP_DIR"
 
-    # Копируем settings.json отдельно
+    # Копируем xwave-conf.json отдельно
     if [ -f "$SETTINGS_FILE" ]; then
         cp "$SETTINGS_FILE" "$SETTINGS_BACKUP_DIR/" || echo "Ошибка копирования $SETTINGS_FILE"
         echo "Файл $SETTINGS_FILE сохранён в $SETTINGS_BACKUP_DIR"

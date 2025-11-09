@@ -102,12 +102,12 @@ jobs:
 
         cp ./etc/ndm/netfilter.d/000-xwave.sh xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
         chmod +x xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
-        cp ./etc/xwave/settings.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xwave/settings.json
+        cp ./etc/xwave/xwave-conf.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xwave/xwave-conf.json
 
     - name: Add conffiles
       run: |
         cat > xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/conffiles <<'EOF'
-        /opt/etc/xwave/settings.json
+        /opt/etc/xwave/xwave-conf.json
         EOF
 
     - name: Add postinst script, add policy Xwave
