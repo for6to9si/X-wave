@@ -71,8 +71,10 @@ jobs:
         mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/init.d
         mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/configs
         mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/dat
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/templates
         mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xwave
         mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/var/log/xwave
+        mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/opt/var/log/xray
         mkdir -p xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL
         
         unzip Xray-linux-${{ matrix.arch }}.zip xray -d xray-${{ matrix.version }}-${{ matrix.arch }}/opt/sbin
@@ -103,11 +105,15 @@ jobs:
         cp ./etc/ndm/netfilter.d/000-xwave.sh xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
         chmod +x xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
         cp ./etc/xwave/xwave-conf.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xwave/xwave-conf.json
+        cp ./etc/xray/templates/00-system-default.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/templates/00-system-default.json
+        cp ./etc/xray/templates/05-routing-balancers.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/templates/05-routing-balancers.json
 
     - name: Add conffiles
       run: |
         cat > xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/conffiles <<'EOF'
         /opt/etc/xwave/xwave-conf.json
+        /opt/etc/xray/templates/00-system-default.json
+        /opt/etc/xray/templates/05-routing-balancers.json
         EOF
 
     - name: Add postinst script, add policy Xwave
