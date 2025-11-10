@@ -378,7 +378,7 @@ backup_config_xray() {
     SETTINGS_BACKUP_DIR="${BACKUP_DIR}/xwave"
 
     XRAY_TEMPLATES_DIR="/opt/etc/xray/templates"
-    XRAY_BACKUP_DIR="${BACKUP_DIR}/xray/templates"
+    XRAY_BACKUP_DIR="${BACKUP_DIR}/templates"
 
     ARCHIVE_FILE="${BACKUP_BASE_DIR}/xray-backup-${TIMESTAMP}.tar.gz"
 
