@@ -373,8 +373,13 @@ backup_config_xray() {
     BACKUP_BASE_DIR="/opt/backups/xray"
     TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
     BACKUP_DIR="${BACKUP_BASE_DIR}/${TIMESTAMP}"
-    SETTINGS_FILE="/opt/etc/xwave/settings.json"
+
+    SETTINGS_FILE="/opt/etc/xwave/xwave-conf.json"
     SETTINGS_BACKUP_DIR="${BACKUP_DIR}/xwave"
+
+    XRAY_TEMPLATES_DIR="/opt/etc/xray/templates"
+    XRAY_BACKUP_DIR="${BACKUP_DIR}/xray/templates"
+
     ARCHIVE_FILE="${BACKUP_BASE_DIR}/xray-backup-${TIMESTAMP}.tar.gz"
 
     # Проверяем существование базовой директории
@@ -405,15 +410,22 @@ backup_config_xray() {
         echo "Источник $SOURCE_DIR не найден. Пропуск копирования конфигурации sing-box."
     fi
 
-    # Создаём поддиректорию для настроек swave
+    # Создаём поддиректорию для настроек xwave
     mkdir -p "$SETTINGS_BACKUP_DIR"
-
-    # Копируем xwave-conf.json отдельно
     if [ -f "$SETTINGS_FILE" ]; then
         cp "$SETTINGS_FILE" "$SETTINGS_BACKUP_DIR/" || echo "Ошибка копирования $SETTINGS_FILE"
         echo "Файл $SETTINGS_FILE сохранён в $SETTINGS_BACKUP_DIR"
     else
         echo "Файл $SETTINGS_FILE не найден. Пропуск."
+    fi
+
+    # Копируем шаблоны Xray
+    if [ -d "$XRAY_TEMPLATES_DIR" ]; then
+        mkdir -p "$XRAY_BACKUP_DIR"
+        cp -r "$XRAY_TEMPLATES_DIR/"* "$XRAY_BACKUP_DIR/" 2>/dev/null
+        echo "Шаблоны Xray из $XRAY_TEMPLATES_DIR скопированы."
+    else
+        echo "Директория $XRAY_TEMPLATES_DIR не найдена. Пропуск."
     fi
 
     # Архивация всего бэкапа
