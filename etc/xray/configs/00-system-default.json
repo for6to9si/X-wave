@@ -1,0 +1,270 @@
+{
+    "log":
+    {
+        "access": "/opt/var/log/xray/access.log", // Запись доступа
+        "error": "/opt/var/log/xray/error.log",   // Запись ошибок
+        "loglevel": "none", // Уровень журнала: от минимального до максимального: "none", "error", "warning", "info", "debug"
+        "dnsLog": true // Включить / Выключить отслеживание DNS запросов: false, true
+    },
+    "dns":
+    {
+        "tag": "dns-in",
+        "servers":
+        [
+            {
+                "address": "https+local://cloudflare-dns.com/dns-query",
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://8.8.4.4/dns-query",
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://router.comss.one/dns-query",
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "quic+local://94.140.15.15:853",
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "quic+local://dns.alidns.com:853",
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://protective.joindns4.eu/dns-query",
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://1.1.1.1/dns-query",
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://149.112.112.10/dns-query",
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "quic+local://94.140.15.15:853",
+                "domains":
+                [
+                    "themoviedb.org",
+                    "www.themoviedb.org",
+                    "domain:browserleaks.org",
+                    "domain:dnsleaktest.com",
+                    "tmdb.org",
+                    "image.tmdb.org",
+                    "api.themoviedb.org",
+                    "tmdb-image-prod.b-cdn.net",
+                    "media.themoviedb.org",
+                    "tmdb-web-image-prod.b-cdn.net",
+                    "domain:megogo.net",
+                    "domain:goproxy.io",
+                    "domain:vscodium.com"
+                ],
+                "skipFallback": false,
+                "finalQuery": true,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://8.8.8.8/dns-query",
+                "domains":
+                [
+                    "lkfl2.nalog.ru",
+                    "domain:nalog.ru",
+                    "googlevideo.com",
+                    "yt3.ggpht.com",
+                    "youtube.com",
+                    "i.ytimg.com",
+                    "youtubei.googleapis.com",
+                    "yt3.ggpht.com",
+                    "yt3.googleusercontent.com",
+                    "google.com",
+                    "googleapis.com",
+                    "gstatic.com",
+                    "youtu.be",
+                    "yastatic.net",
+                    "yandex.net"
+                ],
+                "clientIp": "93.100.42.161",
+                "skipFallback": true,
+                "finalQuery": true,
+                "timeoutMs": 2000
+            }
+        ],
+        "hosts":
+        {
+            "btcpay.local": "192.168.2.150",
+            "pihome.myhome": "192.168.2.100"
+        },
+        "clientIp": "87.171.213.191",
+        "queryStrategy": "UseIPv4",
+        "disableCache": false,
+        "disableFallback": false,
+        "disableFallbackIfMatch": false
+    },
+    "inbounds":
+    [
+        {
+            "tag": "redirect",
+            "port": 61218,
+            "protocol": "dokodemo-door",
+            "settings":
+            {
+                "network": "tcp",
+                "followRedirect": true
+            },
+            "sniffing":
+            {
+                "enabled": true,
+                "destOverride":
+                [
+                    "http",
+                    "tls"
+                ]
+            }
+        },
+        {
+            "tag": "tproxy",
+            "port": 61219,
+            "protocol": "dokodemo-door",
+            "settings":
+            {
+                "network": "udp",
+                "followRedirect": true
+            },
+            "sniffing":
+            {
+                "enabled": true,
+                "routeOnly": true,
+                "destOverride":
+                [
+                    "http",
+                    "tls",
+                    "quic"
+                ],
+                "metadataOnly": true
+            },
+            "streamSettings":
+            {
+                "sockopt":
+                {
+                    "tproxy": "tproxy"
+                }
+            }
+        },
+        {
+            "tag": "socks-in",
+            "protocol": "socks",
+            "listen": "127.0.0.1",
+            "port": 1080,
+            "settings":
+            {
+                "udp": true
+            }
+        },
+        {
+            "listen": "0.0.0.0",
+            "port": 10085,
+            "protocol": "dokodemo-door",
+            "settings":
+            {
+                "address": "0.0.0.0"
+            },
+            "tag": "api"
+        }
+    ],
+    "outbounds":
+    [
+        {
+            "tag": "dns-out",
+            "nonIPQuery": "skip",
+            "blockTypes":
+            [],
+            "protocol": "dns"
+        },
+        {
+            "protocol": "dns",
+            "nonIPQuery": "skip",
+            "settings":
+            {
+                "network": "udp",
+                "address": "8.8.8.8",
+                "port": 53
+            },
+            "tag": "dns-out-tls"
+        },
+        {
+            "tag": "direct",
+            "protocol": "freedom",
+            "settings":
+            {
+                "domainStrategy": "AsIs",
+                "proxyProtocol": 0
+            },
+            "streamSettings":
+            {
+                "sockopt":
+                {
+                    "mark": 255
+                }
+            }
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings":
+            {
+                "response":
+                {
+                    "type": "http"
+                }
+            }
+        }
+    ],
+    "stats":
+    {},
+    "api":
+    {
+        "tag": "api",
+        "services":
+        [
+            "StatsService",
+            "HandlerService",
+            "LoggerService",
+            "RoutingService",
+            "ObservatoryService",
+            "ReflectionService"
+        ]
+    },
+    "policy":
+    {
+        "levels":
+        {
+            "0":
+            {
+                "connIdle": 300,
+                "bufferSize": 4,
+                "downlinkOnly": 1,
+                "handshake": 4,
+                "uplinkOnly": 1,
+                "statsUserUplink": true,
+                "statsUserDownlink": true
+            }
+        },
+        "system":
+        {
+            "statsInboundUplink": true,
+            "statsInboundDownlink": true,
+            "statsOutboundUplink": true,
+            "statsOutboundDownlink": true
+        }
+    }
+}

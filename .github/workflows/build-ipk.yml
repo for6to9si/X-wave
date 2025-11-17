@@ -105,14 +105,14 @@ jobs:
         cp ./etc/ndm/netfilter.d/000-xwave.sh xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/
         chmod +x xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/ndm/netfilter.d/000-xwave.sh
         cp ./etc/xwave/xwave-conf.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xwave/xwave-conf.json
-        cp ./etc/xray/templates/!tmp_00-system-default.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/templates/!tmp_00-system-default.json
+        cp ./etc/xray/configs/00-system-default.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/configs/00-system-default.json
         cp ./etc/xray/templates/!tmp_05-routing-balancers.json xray-${{ matrix.version }}-${{ matrix.arch }}/opt/etc/xray/templates/!tmp_05-routing-balancers.json
 
     - name: Add conffiles
       run: |
         cat > xray-${{ matrix.version }}-${{ matrix.arch }}/CONTROL/conffiles <<'EOF'
         /opt/etc/xwave/xwave-conf.json
-        /opt/etc/xray/templates/!tmp_00-system-default.json
+        /opt/etc/xray/configs/00-system-default.json
         /opt/etc/xray/templates/!tmp_05-routing-balancers.json
         EOF
 

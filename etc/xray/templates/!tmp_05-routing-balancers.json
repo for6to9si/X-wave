@@ -1,187 +1,143 @@
 {
-  "burstObservatory":
-  {
-    "pingConfig":
+    "burstObservatory":
     {
-      "connectivity": "http://connectivitycheck.platform.hicloud.com/generate_204",
-      "destination": "http://www.google.com/gen_204",
-      "interval": "30m",
-      "sampling": 2,
-      "timeout": "10s"
-    },
-    "subjectSelector":
-    [
-      "vless-german",
-      "vless-reality",
-      "ss-german",
-      "test-vless"
-    ]
-  },
-  "routing":
-  {
-    "domainStrategy": "IPIfNonMatch",
-    "balancers":
-    [
-      {
-        "tag": "bestVPN",
-        "selector":
-        [
-          "vless-german",
-          "vless-reality",
-          "ss-german",
-          "test-vless"
-        ],
-        "fallbackTag": "ss-german",
-        "strategy":
+        "pingConfig":
         {
-          "type": "leastLoad"
-        }
-      }
-    ],
-    "rules":
-    [
-      {
-        "inboundTag":
+            "connectivity": "http://connectivitycheck.platform.hicloud.com/generate_204",
+            "destination": "http://www.google.com/gen_204",
+            "interval": "30m",
+            "sampling": 2,
+            "timeout": "10s"
+        },
+        "subjectSelector":
         [
-          "api"
-        ],
-        "outboundTag": "api",
-        "type": "field"
-      },
-      {
-        "type": "field",
-        "inboundTag":
-        [
-          "redirect",
-          "tproxy",
-          "socks-in"
-        ],
-        "port": 53,
-        "outboundTag": "dns-out"
-      },
-      {
-        "network": "udp",
-        "port": "443",
-        "outboundTag": "block",
-        "type": "field"
-      },
-      {
-        "inboundTag":
-        [
-          "redirect",
-          "tproxy",
-          "socks-in"
-        ],
-        "outboundTag": "block",
-        "type": "field",
-        "network": "udp",
-        "port": "135, 137, 138, 139"
-      },
-      {
-        "inboundTag":
-        [
-          "redirect",
-          "tproxy",
-          "socks-in"
-        ],
-        "balancerTag": "bestVPN",
-        "type": "field",
-        "domain":
-        [
-          "ext:geosite_v2fly.dat:category-dev",
-          "ext:geosite_v2fly.dat:openai",
-          "ext:geosite_v2fly.dat:bing",
-          "ext:geosite_v2fly.dat:anthropic",
-          "ext:geosite_v2fly.dat:notion",
-          "ext:geosite_v2fly.dat:jetbrains",
-          "ext:geosite_v2fly.dat:openwrt",
-          "ext:geosite_v2fly.dat:vmware",
-          "ext:geosite_v2fly.dat:intel",
-          "ext:geosite_v2fly.dat:qualcomm",
-          "ext:geosite_v2fly.dat:nvidia",
-          "ext:geosite_v2fly.dat:intel",
-          "ext:geosite_v2fly.dat:google-deepmind",
-          "ext:geosite_v2fly.dat:google-gemini",
-          "domain:download-cdn.jetbrains.com",
-          "domain:jetbrains.ai",
-          "domain:plugins.jetbrains.com",
-          "domain:downloads.marketplace.jetbrains.com",
-          "domain:ifconfig.co",
-          "domain:2ip.io",
-          "domain:quic.nginx.org",
-          "domain:vscodium.com"
+            "vless-german",
+            "vless-reality",
+            "vless-xhttp-german"
         ]
-      },
-      {
-        "inboundTag":
+    },
+    "routing":
+    {
+        "domainStrategy": "IPIfNonMatch",
+        "balancers":
         [
-          "redirect",
-          "tproxy",
-          "dns-in",
-          "socks-in"
+            {
+                "tag": "bestVPN",
+                "selector":
+                [
+                    "vless-german",
+                    "vless-reality",
+                    "vless-xhttp-german"
+                ],
+                "fallbackTag": "vless-german",
+                "strategy":
+                {
+                    "type": "leastLoad"
+                }
+            }
         ],
-        "balancerTag": "bestVPN",
-        "type": "field",
-        "ip":
+        "rules":
         [
-          "160.79.104.0/21"
+            {
+                "inboundTag":
+                [
+                    "api"
+                ],
+                "outboundTag": "api",
+                "type": "field"
+            },
+            {
+                "type": "field",
+                "inboundTag":
+                [
+                    "redirect",
+                    "tproxy",
+                    "dns-local",
+                    "socks-in"
+                ],
+                "port": 53,
+                "outboundTag": "dns-out"
+            },
+            {
+                "network": "udp",
+                "port": "443",
+                "outboundTag": "block",
+                "type": "field"
+            },
+            {
+                "inboundTag":
+                [
+                    "redirect",
+                    "tproxy",
+                    "socks-in"
+                ],
+                "outboundTag": "block",
+                "type": "field",
+                "network": "udp",
+                "port": "135, 137, 138, 139"
+            },
+            {
+                "inboundTag":
+                [
+                    "redirect",
+                    "tproxy",
+                    "socks-in"
+                ],
+                "xwave-domain": "true",
+                "balancerTag": "bestVPN",
+                "type": "field",
+                "domain":
+                [
+                    "domain:download-cdn.jetbrains.com",
+                    "domain:jetbrains.ai",
+                    "domain:plugins.jetbrains.com",
+                    "domain:downloads.marketplace.jetbrains.com",
+                    "domain:ifconfig.co",
+                    "domain:2ip.io",
+                    "domain:quic.nginx.org",
+                    "domain:vscodium.com"
+                ]
+            },
+            {
+                "inboundTag":
+                [
+                    "redirect",
+                    "tproxy",
+                    "socks-in"
+                ],
+                "xwave-ip": "true",
+                "balancerTag": "bestVPN",
+                "type": "field",
+                "ip":
+                [
+                    "160.79.104.0/21",
+                    "178.49.128.0/22"
+                ]
+            },
+            {
+                "inboundTag":
+                [
+                    "redirect",
+                    "tproxy",
+                    "socks-in"
+                ],
+                "outboundTag": "direct",
+                "type": "field",
+                "protocol":
+                [
+                    "bittorrent"
+                ]
+            },
+            {
+                "inboundTag":
+                [
+                    "redirect",
+                    "tproxy",
+                    "socks-in"
+                ],
+                "outboundTag": "direct",
+                "type": "field"
+            }
         ]
-      },
-      {
-        "inboundTag":
-        [
-          "redirect",
-          "tproxy",
-          "socks-in"
-        ],
-        "outboundTag": "direct",
-        "type": "field",
-        "protocol":
-        [
-          "bittorrent"
-        ]
-      },
-      {
-        "inboundTag":
-        [
-          "redirect",
-          "tproxy",
-          "socks-in"
-        ],
-        "balancerTag": "bestVPN",
-        "type": "field",
-        "ip":
-        [
-          "ext:geoip_v2fly.dat:netflix",
-          "178.49.128.0/22"
-        ]
-      },
-      {
-        "inboundTag":
-        [
-          "redirect",
-          "dns-in",
-          "tproxy",
-          "socks-in"
-        ],
-        "outboundTag": "direct",
-        "type": "field",
-        "domain":
-        [
-          "ext:geoip_v2fly.dat:ru"
-        ]
-      },
-      {
-        "inboundTag":
-        [
-          "redirect",
-          "tproxy",
-          "dns-in",
-          "socks-in"
-        ],
-        "outboundTag": "direct",
-        "type": "field"
-      }
-    ]
-  }
+    }
 }
