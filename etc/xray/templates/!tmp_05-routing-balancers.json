@@ -83,7 +83,7 @@
                     "tproxy",
                     "socks-in"
                 ],
-                "xwave-domain": "true",
+                "ruleTag": "xwave-domains",
                 "balancerTag": "bestVPN",
                 "type": "field",
                 "domain":
