@@ -12,7 +12,7 @@
   },
   "network":
   {
-    "table_id": "224",
+    "table_id": "226",
     "table_mark_hex": "0x3629",
     "connection_policy": "xwave",
     "chain_name": "xwave",
