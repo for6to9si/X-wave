@@ -102,7 +102,10 @@
         "hosts":
         {
             "btcpay.local": "192.168.2.150",
-            "pihome.myhome": "192.168.2.100"
+            "ntc.party": "130.255.77.28",
+            "homeassistant.myhome": "192.168.2.10",
+            "tele2.kz": ["104.31.16.56", "172.64.155.10", "104.26.8.10"],
+            "gtalens.com": ["104.29.125.204","104.31.16.172"]
         },
         "clientIp": "87.171.213.191",
         "queryStrategy": "UseIPv4",
