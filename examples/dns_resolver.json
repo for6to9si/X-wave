@@ -1,17 +1,56 @@
 {
+    "log":
+    {
+        "access": "/opt/var/log/xray/access.log", // Запись доступа
+        "error": "/opt/var/log/xray/error.log",   // Запись ошибок
+        "loglevel": "debug", // Уровень журнала: от минимального до максимального: "none", "error", "warning", "info", "debug"
+        "dnsLog": true // Включить / Выключить отслеживание DNS запросов: false, true
+    },
     "dns":
     {
         "tag": "dns-in",
         "servers":
         [
-            "https+local://cloudflare-dns.com/dns-query",
-            "https+local://8.8.4.4/dns-query",
-            "https+local://router.comss.one/dns-query",
-            "quic+local://94.140.15.15:853",
-            "quic+local://dns.alidns.com:853",
-            "https+local://protective.joindns4.eu/dns-query",
-            "https+local://1.1.1.1/dns-query",
-            "https+local://149.112.112.10/dns-query",
+            {
+                "address": "https+local://cloudflare-dns.com/dns-query",
+                "finalQuery": false,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://8.8.4.4/dns-query",
+                "finalQuery": false,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://router.comss.one/dns-query",
+                "finalQuery": false,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "quic+local://94.140.15.15:853",
+                "finalQuery": false,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "quic+local://dns.alidns.com:853",
+                "finalQuery": false,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://protective.joindns4.eu/dns-query",
+                "finalQuery": false,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://1.1.1.1/dns-query",
+                "finalQuery": false,
+                "timeoutMs": 2000
+            },
+            {
+                "address": "https+local://149.112.112.10/dns-query",
+                "finalQuery": false,
+                "timeoutMs": 2000
+            },
             {
                 "address": "quic+local://94.140.15.15:853",
                 "domains":
@@ -29,11 +68,12 @@
                     "domain:goproxy.io",
                     "domain:vscodium.com"
                 ],
-                "skipFallback": false
+                "skipFallback": false,
+                "finalQuery": true,
+                "timeoutMs": 2000
             },
             {
-                "address": "77.88.8.8",
-                "port": 53,
+                "address": "https+local://8.8.8.8/dns-query",
                 "domains":
                 [
                     "lkfl2.nalog.ru",
@@ -52,13 +92,22 @@
                     "yastatic.net",
                     "yandex.net"
                 ],
-                "skipFallback": true
+                "clientIp": "93.100.42.161",
+                "skipFallback": true,
+                "finalQuery": true,
+                "timeoutMs": 2000
             }
         ],
-        "clientIp": "1.2.3.4",
+        "hosts":
+        {
+            "btcpay.local": "192.168.2.150",
+            "pihome.myhome": "192.168.2.100"
+        },
+        "clientIp": "87.171.213.191",
         "queryStrategy": "UseIPv4",
         "disableCache": false,
         "disableFallback": false,
+        "enableParallelQuery": false,
         "disableFallbackIfMatch": false
     },
     "inbounds":

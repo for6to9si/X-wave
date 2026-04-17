@@ -13,42 +13,42 @@
         [
             {
                 "address": "https+local://cloudflare-dns.com/dns-query",
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
                 "address": "https+local://8.8.4.4/dns-query",
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
                 "address": "https+local://router.comss.one/dns-query",
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
                 "address": "quic+local://94.140.15.15:853",
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
                 "address": "quic+local://dns.alidns.com:853",
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
                 "address": "https+local://protective.joindns4.eu/dns-query",
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
                 "address": "https+local://1.1.1.1/dns-query",
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
                 "address": "https+local://149.112.112.10/dns-query",
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
@@ -70,7 +70,7 @@
                     "domain:vscodium.com"
                 ],
                 "skipFallback": false,
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
@@ -95,7 +95,7 @@
                 ],
                 "clientIp": "93.100.42.161",
                 "skipFallback": true,
-                "finalQuery": true,
+                "finalQuery": false,
                 "timeoutMs": 2000
             }
         ],
@@ -108,6 +108,7 @@
         "queryStrategy": "UseIPv4",
         "disableCache": false,
         "disableFallback": false,
+        "enableParallelQuery": false,
         "disableFallbackIfMatch": false
     },
     "inbounds":
