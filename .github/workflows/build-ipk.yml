@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       copy:
-        description: 'Build all releases'
-        required: false
+        description: 'retain only latest release version'
+        required: true
         default: 'false'
         type: choice
         options:
