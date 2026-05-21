@@ -26,7 +26,7 @@ jobs:
       - name: Determine versions
         id: set-versions
         run: |
-          if [ "${{ github.event.inputs.copy }}" = "false" ]; then
+          if [ !"${{ github.event.inputs.copy }}" ]; then
             versions=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases \
               | jq -r '.[] | select(.prerelease == ${{ github.event.inputs.copy }}) | .tag_name' \
               | grep '^v[0-9]\+' \
