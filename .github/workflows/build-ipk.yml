@@ -28,7 +28,7 @@ jobs:
         run: |
           if [ "${{ github.event.inputs.copy }}" = "false" ]; then
             versions=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases \
-              | jq -r '.[] | select(.prerelease == ${{ github.event.inputs.copy }}) | .tag_name' \
+              | jq -r '.[] | select(.prerelease == !${{ github.event.inputs.copy }}) | .tag_name' \
               | grep '^v[0-9]\+' \
               | sed 's/^v//' \
               | awk -F. '($1 == 26 && $2 >= 5)' \
