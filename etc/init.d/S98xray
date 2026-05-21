@@ -156,7 +156,7 @@ start_xray() {
 
     # Записываем информацию в лог и запускаем xray
     {
-      export XRAY_RAY_BUFFER_SIZE=4
+      export XRAY_RAY_BUFFER_SIZE=6
       export XRAY_LOCATION_ASSET="${path_data}"
       export XRAY_LOCATION_CONFDIR="${path_configs}"
       echo -e "\n=== $(date) === xray client info ==="
