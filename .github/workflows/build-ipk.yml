@@ -36,6 +36,7 @@ jobs:
 
             # Преобразуем список в JSON-массив одной строкой
             versions_json=$(echo "$versions" | jq -R . | jq -s -c .)
+            echo "Determine versions: $versions_json"
           else
             latest=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r '.tag_name' | sed 's/^v//')
             versions_json=$(echo "[\"$latest\"]")
