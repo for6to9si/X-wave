@@ -31,7 +31,7 @@ jobs:
               | jq -r '.[] | select(.prerelease != ${{ github.event.inputs.copy }}) | .tag_name' \
               | grep '^v[0-9]\+' \
               | sed 's/^v//' \
-              | awk -F. '($1 == 26 && $2 >= 5)' \
+              | awk -F. '($1 == 26 && $2 >= 7)' \
               | sort -V)
 
             # Преобразуем список в JSON-массив одной строкой
