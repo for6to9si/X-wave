@@ -12,12 +12,12 @@
         "servers":
         [
             {
-                "address": "https+local://cloudflare-dns.com/dns-query",
+                "address": "https+local://8.8.4.4/dns-query",
                 "finalQuery": false,
                 "timeoutMs": 2000
             },
             {
-                "address": "https+local://8.8.4.4/dns-query",
+                "address": "https+local://cloudflare-dns.com/dns-query",
                 "finalQuery": false,
                 "timeoutMs": 2000
             },
@@ -112,7 +112,7 @@
         "disableCache": false,
         "disableFallback": false,
         "enableParallelQuery": false,
-        "disableFallbackIfMatch": false
+        "disableFallbackIfMatch": true
     },
     "inbounds":
     [
